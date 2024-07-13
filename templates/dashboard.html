@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Панель управления</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="dashboard-container">
+        <h1>Панель управления</h1>
+
+        <button onclick="startShift()">Начать смену</button>
+        <button onclick="endShift()">Завершить смену</button>
+
+        <h2>Выберите простой</h2>
+        <select id="downtimeSelect"></select>
+        <select id="downtimeTypeSelect"></select>
+        <button onclick="assignDowntime()">Применить простой</button>
+
+        <h2>Управление оборудованием</h2>
+        <select id="equipmentSelect"></select>
+        <button onclick="assignEquipment()">Назначить оборудование</button>
+        <button onclick="releaseEquipment()">Освободить оборудование</button>
+    </div>
+
+    <script>
+        // Загрузка списка простоев и оборудования при загрузке страницы
+        function loadDowntimes() {
+            fetch('/downtimes')
+            .then(response => response.json())
+            .then(data => {
+                const downtimeSelect = document.getElementById('downtimeSelect');
+                data.forEach(downtime => {
+                    const option = document.createElement('option');
+                    option.value = downtime.id;
+                    option.textContent = downtime.name;
+                    downtimeSelect.appendChild(option);
+                });
+            })
+            .catch(error => console.error('Ошибка:', error));
+
+            fetch('/downtime_types')
+            .then(response => response.json())
+            .then(types => {
+                const typeSelect = document.getElementById('downtimeTypeSelect');
+                types.forEach(type => {
+                    const option = document.createElement('option');
+                    option.value = type.id;
+                    option.textContent = type.description;
+                    typeSelect.appendChild(option);
+                });
+            })
+            .catch(error => console.error('Ошибка при загрузке типов:', error));
+
+            fetch('/equipment/')
+            .then(response => response.json())
+            .then(data => {
+                const equipmentSelect = document.getElementById('equipmentSelect');
+                data.forEach(equipment => {
+                    const option = document.createElement('option');
+                    option.value = equipment.id;
+                    option.textContent = equipment.name;
+                    equipmentSelect.appendChild(option);
+                });
+            })
+            .catch(error => console.error('Ошибка при загрузке оборудования:', error));
+        }
+
+        function startShift() {
+            const userId = sessionStorage.getItem('userId');
+            fetch(`/start_shift/`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ user_id: userId })
+            })
+            .then(response => response.json())
+            .then(data => alert('Смена начата: ' + data.time))
+            .catch(error => console.error('Ошибка:', error));
+        }
+
+        function endShift() {
+            const userId = sessionStorage.getItem('userId');
+            fetch(`/end_shift/`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ user_id: userId })
+            })
+            .then(response => response.json())
+            .then(data => alert('Смена завершена: ' + data.time))
+            .catch(error => console.error('Ошибка:', error));
+        }
+
+        function assignDowntime() {
+            const userId = sessionStorage.getItem('userId');
+            const downtimeId = document.getElementById('downtimeSelect').value;
+            const typeId = document.getElementById('downtimeTypeSelect').value;
+
+            fetch('/assign_downtime/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ user_id: userId, downtime_id: downtimeId, type_id: typeId })
+            })
+            .then(response => response.json())
+            .then(data => alert('Простой применен: ' + data.message))
+            .catch(error => console.error('Ошибка:', error));
+        }
+
+        function assignEquipment() {
+            const userId = sessionStorage.getItem('userId');
+            const equipmentId = document.getElementById('equipmentSelect').value;
+            fetch('/assign_equipment/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ user_id: userId, equipment_id: equipmentId })
+            })
+            .then(response => response.json())
+            .then(data => alert('Оборудование назначено: ' + data.message))
+            .catch(error => console.error('Ошибка:', error));
+        }
+
+        function releaseEquipment() {
+            const userId = sessionStorage.getItem('userId');
+            const equipmentId = document.getElementById('equipmentSelect').value;
+            fetch('/release_equipment/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ user_id: userId, equipment_id: equipmentId })
+            })
+            .then(response => response.json())
+            .then(data => alert('Оборудование освобождено: ' + data.message))
+            .catch(error => console.error('Ошибка:', error));
+        }
+
+        window.onload = loadDowntimes;
+    </script>
+</body>
+</html>
