@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Выбор пользователя</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="user-select-container">
+        <h1>Выберите пользователя</h1>
+        <form action="/login" method="get">
+            <select name="username" required>
+                {% for user in users %}
+                    <option value="{{ user.user_name }}">{{ user.user_name }}</option>
+                {% endfor %}
+            </select>
+            <button type="submit">Продолжить</button>
+        </form>
+    </div>
+</body>
+</html>

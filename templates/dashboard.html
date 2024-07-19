@@ -8,130 +8,104 @@
 <body>
     <div class="dashboard-container">
         <h1>Панель управления</h1>
+        <div id="equipment-list">
+            <!-- Список оборудования заполняется динамически через JavaScript -->
+        </div>
+        <script>
+            document.addEventListener("DOMContentLoaded", function() {
+                const groupId = "{{ group_id }}";  // Используем переданный group_id
+                fetch(`/equipment/${groupId}`)
+                .then(response => response.json())
+                .then(data => {
+                    const list = document.getElementById('equipment-list');
+                    data.forEach(equipment => {
+                        const item = document.createElement('div');
+                        item.className = 'equipment-item ' + (equipment.active ? 'active' : 'inactive');
+                        item.innerHTML = `
+                            <span>${equipment.name}</span>
+                            <button onclick="toggleEquipment(${equipment.id})">Переключить</button>
+                            <button onclick="loadDowntimes(${equipment.id})">Простои</button>
+                            <div id="downtimes-${equipment.id}" class="downtime-container"></div>
+                        `;
+                        list.appendChild(item);
+                    });
+                })
+                .catch(error => console.error('Error loading equipment:', error));
+            });
 
-        <button onclick="startShift()">Начать смену</button>
-        <button onclick="endShift()">Завершить смену</button>
+            function toggleEquipment(equipmentId) {
+                fetch(`/toggle-equipment/${equipmentId}`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'}
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        alert('Статус оборудования успешно переключен!');
+                        location.reload();  // Перезагрузка страницы для обновления статусов
+                    } else {
+                        throw new Error(data.message || 'Не удалось переключить статус оборудования');
+                    }
+                })
+                .catch(error => console.error('Error toggling equipment:', error));
+            }
 
-        <h2>Выберите простой</h2>
-        <select id="downtimeSelect"></select>
-        <select id="downtimeTypeSelect"></select>
-        <button onclick="assignDowntime()">Применить простой</button>
+            function loadDowntimes(equipmentId) {
+                console.log(`Loading downtimes for equipment ID: ${equipmentId}`);
+                fetch(`/downtimes/${equipmentId}`)
+                .then(response => response.json())
+                .then(data => {
+                    console.log('Downtimes data:', data);
+                    const container = document.getElementById(`downtimes-${equipmentId}`);
+                    container.innerHTML = '';  // Clear previous entries
+                    data.forEach(downtime => {
+                        const entry = document.createElement('div');
+                        entry.className = 'downtime-entry';
+                        entry.id = `downtime-${JSON.stringify(downtime.id)}`;
+                        entry.innerHTML = `
+                            Start: ${downtime.start_id}, Stop: ${downtime.stop_id || 'Ongoing'}
+                            <button onclick="showAnswers(${JSON.stringify(downtime.id)})">Update Reason</button>
+                        `;
+                        container.appendChild(entry);
+                    });
+                })
+                .catch(error => console.error('Error loading downtimes:', error));
+            }
 
-        <h2>Управление оборудованием</h2>
-        <select id="equipmentSelect"></select>
-        <button onclick="assignEquipment()">Назначить оборудование</button>
-        <button onclick="releaseEquipment()">Освободить оборудование</button>
+            function showAnswers(downtimeId) {
+                fetch(`/answers`)
+                .then(response => response.json())
+                .then(data => {
+                    const selector = document.createElement('select');
+                    data.forEach(answer => {
+                        const option = document.createElement('option');
+                        option.value = answer.answer_id;
+                        option.text = answer.answer_text;
+                        selector.appendChild(option);
+                    });
+                    selector.onchange = function() { updateDowntime(downtimeId, this.value); }
+                    document.querySelector(`#downtime-${JSON.stringify(downtimeId)}`).appendChild(selector);
+                })
+                .catch(error => console.error('Error loading answers:', error));
+            }
+
+            function updateDowntime(downtimeId, answerId) {
+                fetch(`/update-downtime/${downtimeId}`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({answer_id: answerId})
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        alert('Downtime updated successfully!');
+                    } else {
+                        throw new Error(data.message || 'Failed to update downtime');
+                    }
+                })
+                .catch(error => console.error('Error updating downtime:', error));
+            }
+        </script>
     </div>
-
-    <script>
-        // Загрузка списка простоев и оборудования при загрузке страницы
-        function loadDowntimes() {
-            fetch('/downtimes')
-            .then(response => response.json())
-            .then(data => {
-                const downtimeSelect = document.getElementById('downtimeSelect');
-                data.forEach(downtime => {
-                    const option = document.createElement('option');
-                    option.value = downtime.id;
-                    option.textContent = downtime.name;
-                    downtimeSelect.appendChild(option);
-                });
-            })
-            .catch(error => console.error('Ошибка:', error));
-
-            fetch('/downtime_types')
-            .then(response => response.json())
-            .then(types => {
-                const typeSelect = document.getElementById('downtimeTypeSelect');
-                types.forEach(type => {
-                    const option = document.createElement('option');
-                    option.value = type.id;
-                    option.textContent = type.description;
-                    typeSelect.appendChild(option);
-                });
-            })
-            .catch(error => console.error('Ошибка при загрузке типов:', error));
-
-            fetch('/equipment/')
-            .then(response => response.json())
-            .then(data => {
-                const equipmentSelect = document.getElementById('equipmentSelect');
-                data.forEach(equipment => {
-                    const option = document.createElement('option');
-                    option.value = equipment.id;
-                    option.textContent = equipment.name;
-                    equipmentSelect.appendChild(option);
-                });
-            })
-            .catch(error => console.error('Ошибка при загрузке оборудования:', error));
-        }
-
-        function startShift() {
-            const userId = sessionStorage.getItem('userId');
-            fetch(`/start_shift/`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ user_id: userId })
-            })
-            .then(response => response.json())
-            .then(data => alert('Смена начата: ' + data.time))
-            .catch(error => console.error('Ошибка:', error));
-        }
-
-        function endShift() {
-            const userId = sessionStorage.getItem('userId');
-            fetch(`/end_shift/`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ user_id: userId })
-            })
-            .then(response => response.json())
-            .then(data => alert('Смена завершена: ' + data.time))
-            .catch(error => console.error('Ошибка:', error));
-        }
-
-        function assignDowntime() {
-            const userId = sessionStorage.getItem('userId');
-            const downtimeId = document.getElementById('downtimeSelect').value;
-            const typeId = document.getElementById('downtimeTypeSelect').value;
-
-            fetch('/assign_downtime/', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ user_id: userId, downtime_id: downtimeId, type_id: typeId })
-            })
-            .then(response => response.json())
-            .then(data => alert('Простой применен: ' + data.message))
-            .catch(error => console.error('Ошибка:', error));
-        }
-
-        function assignEquipment() {
-            const userId = sessionStorage.getItem('userId');
-            const equipmentId = document.getElementById('equipmentSelect').value;
-            fetch('/assign_equipment/', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ user_id: userId, equipment_id: equipmentId })
-            })
-            .then(response => response.json())
-            .then(data => alert('Оборудование назначено: ' + data.message))
-            .catch(error => console.error('Ошибка:', error));
-        }
-
-        function releaseEquipment() {
-            const userId = sessionStorage.getItem('userId');
-            const equipmentId = document.getElementById('equipmentSelect').value;
-            fetch('/release_equipment/', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ user_id: userId, equipment_id: equipmentId })
-            })
-            .then(response => response.json())
-            .then(data => alert('Оборудование освобождено: ' + data.message))
-            .catch(error => console.error('Ошибка:', error));
-        }
-
-        window.onload = loadDowntimes;
-    </script>
 </body>
 </html>

@@ -1,11 +1,12 @@
 # app/dependencies
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 
-from .database import engine
+from app.database import engine
 
 
 def get_db():
-    SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+    SessionLocal = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
     db = SessionLocal()
     try:
         yield db

@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Выбор группы</title>
+    <link rel="stylesheet" href="/static/css/style.css"> <!-- Убедитесь, что путь к CSS правильный -->
+</head>
+<body>
+    <div class="select-group-container">
+        <h1>Выберите группу</h1>
+        <form action="/set-group" method="post">
+            <label for="group_id" hidden>Выберите группу</label> <!-- Доступность: добавлен скрытый label -->
+            <select name="group_id" id="group_id" required aria-label="Выбор группы">
+                {% for group in groups %}
+                    <option value="{{ group.group_id }}">{{ group.group_name }}</option>
+                {% endfor %}
+            </select>
+            <button type="submit">Продолжить</button>
+        </form>
+    </div>
+</body>
+</html>
+

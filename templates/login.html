@@ -8,7 +8,8 @@
 <body>
     <div class="login-container">
         <h2>Вход в систему</h2>
-        <form id="loginForm">
+        <form action="/login" method="post">
+            <input type="hidden" name="group_id" value="{{group_id}}" />
             <div class="form-group">
                 <label for="username">Имя пользователя:</label>
                 <input type="text" id="username" name="username" required>
@@ -22,30 +23,5 @@
             </div>
         </form>
     </div>
-    <script>
-        document.getElementById('loginForm').addEventListener('submit', function(event) {
-            event.preventDefault();
-            const username = document.getElementById('username').value;
-            const password = document.getElementById('password').value;
-            
-            fetch('/login', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ username, password })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.user_id) {
-                    sessionStorage.setItem('userId', data.user_id);
-                    window.location.href = '/dashboard.html'; // Перенаправление на главную страницу
-                } else {
-                    alert('Ошибка входа');
-                }
-            })
-            .catch(error => console.error('Ошибка:', error));
-        });
-    </script>
 </body>
 </html>
