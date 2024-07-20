@@ -23,14 +23,23 @@
                         item.className = 'equipment-item ' + (equipment.active ? 'active' : 'inactive');
                         item.innerHTML = `
                             <span>${equipment.name}</span>
-                            <button onclick="toggleEquipment(${equipment.id})">Переключить</button>
-                            <button onclick="loadDowntimes(${equipment.id})">Простои</button>
+                            <button data-equipment-id="${equipment.id}" class="toggle-equipment">Переключить</button>
+                            <button data-equipment-id="${equipment.id}" class="downtime-button">Простои</button>
                             <div id="downtimes-${equipment.id}" class="downtime-container"></div>
                         `;
                         list.appendChild(item);
                     });
                 })
                 .catch(error => console.error('Error loading equipment:', error));
+            });
+
+            document.addEventListener('click', function(event) {
+                if (event.target.matches('.toggle-equipment')) {
+                    toggleEquipment(event.target.getAttribute('data-equipment-id'));
+                }
+                if (event.target.matches('.downtime-button')) {
+                    loadDowntimes(event.target.getAttribute('data-equipment-id'));
+                }
             });
 
             function toggleEquipment(equipmentId) {
@@ -61,10 +70,10 @@
                     data.forEach(downtime => {
                         const entry = document.createElement('div');
                         entry.className = 'downtime-entry';
-                        entry.id = `downtime-${JSON.stringify(downtime.id)}`;
+                        entry.id = `downtime-${downtime.id.equipment_id}-${downtime.id.start_id}`;
                         entry.innerHTML = `
                             Start: ${downtime.start_id}, Stop: ${downtime.stop_id || 'Ongoing'}
-                            <button onclick="showAnswers(${JSON.stringify(downtime.id)})">Update Reason</button>
+                            <button data-equipment-id="${downtime.id.equipment_id}" data-start-id="${downtime.id.start_id}" class="update-reason">Update Reason</button>
                         `;
                         container.appendChild(entry);
                     });
@@ -72,7 +81,13 @@
                 .catch(error => console.error('Error loading downtimes:', error));
             }
 
-            function showAnswers(downtimeId) {
+            document.addEventListener('click', function(event) {
+                if (event.target.matches('.update-reason')) {
+                    showAnswers(event.target.getAttribute('data-equipment-id'), event.target.getAttribute('data-start-id'));
+                }
+            });
+
+            function showAnswers(equipmentId, startId) {
                 fetch(`/answers`)
                 .then(response => response.json())
                 .then(data => {
@@ -83,17 +98,20 @@
                         option.text = answer.answer_text;
                         selector.appendChild(option);
                     });
-                    selector.onchange = function() { updateDowntime(downtimeId, this.value); }
-                    document.querySelector(`#downtime-${JSON.stringify(downtimeId)}`).appendChild(selector);
+                    selector.onchange = function() { updateDowntime(equipmentId, startId, this.value); }
+                    document.querySelector(`#downtime-${equipmentId}-${startId}`).appendChild(selector);
                 })
                 .catch(error => console.error('Error loading answers:', error));
             }
+            function updateDowntime(equipmentId, startId, answerId) {
+                console.log("Original answerId:", answerId); // Для проверки исходного значения
+                const numericAnswerId = parseInt(answerId, 10);
+                console.log("Converted numericAnswerId:", numericAnswerId);
 
-            function updateDowntime(downtimeId, answerId) {
-                fetch(`/update-downtime/${downtimeId}`, {
+                fetch(`/update-downtime/${equipmentId}/${startId}`, {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({answer_id: answerId})
+                    body: JSON.stringify({ answer_id: parseInt(answerId, 10) }) // Преобразование в число
                 })
                 .then(response => response.json())
                 .then(data => {
@@ -104,7 +122,7 @@
                     }
                 })
                 .catch(error => console.error('Error updating downtime:', error));
-            }
+            }                        
         </script>
     </div>
 </body>

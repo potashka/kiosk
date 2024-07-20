@@ -5,6 +5,7 @@ from datetime import datetime
 from fastapi import (
     FastAPI, Depends, Form, HTTPException, Request, UploadFile
 )
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from fastapi.responses import RedirectResponse
@@ -33,6 +34,15 @@ app = FastAPI(lifespan=lifespan)
 app.add_middleware(SessionMiddleware, secret_key="your_secret_key")  # Добавьте секретный ключ
 templates = Jinja2Templates(directory="templates")
 app.mount("/static", StaticFiles(directory="static"), name="static")
+
+
+class DowntimeUpdateRequest(BaseModel):
+    """
+    Модель данных для обновления информации о простоях.
+    Эта модель используется для валидации входящих данных запроса,
+    убеждаясь, что 'answer_id' предоставлен в виде целого числа и является частью тела запроса.
+    """
+    answer_id: int
 
 
 @app.get("/select-group")
@@ -216,9 +226,12 @@ async def get_downtimes(equipment_id: int, db: AsyncSession = Depends(get_db)):
     async with db.begin():
         result = await db.execute(select(Workflow).filter(Workflow.equipment_id == equipment_id))
         downtimes = result.scalars().all()
-    
+
     return [{
-        "id": (downtime.equipment_id, downtime.start_id),  # Используем составной ключ
+        "id": {
+            "equipment_id": downtime.equipment_id,
+            "start_id": downtime.start_id
+        },
         "equipment_id": downtime.equipment_id,
         "start_id": datetime.utcfromtimestamp(downtime.start_id).strftime("%Y-%m-%d %H:%M:%S"),
         "stop_id": datetime.utcfromtimestamp(downtime.stop_id).strftime("%Y-%m-%d %H:%M:%S") if downtime.stop_id else None,
@@ -226,17 +239,19 @@ async def get_downtimes(equipment_id: int, db: AsyncSession = Depends(get_db)):
     } for downtime in downtimes]
 
 
-@app.post("/update-downtime/{downtime_id}")
-async def update_downtime(downtime_id: int, answer_id: int, db: AsyncSession = Depends(get_db)):
+@app.post("/update-downtime/{equipment_id}/{start_id}")
+async def update_downtime(equipment_id: int, start_id: int, request: DowntimeUpdateRequest, db: AsyncSession = Depends(get_db)):
     """
     Обновляет простой, связывая его с ответом оператора.
     """
     async with db.begin():
-        result = await db.execute(select(Workflow).filter(Workflow.equipment_id == downtime_id))  # Используем equipment_id вместо id
+        result = await db.execute(
+            select(Workflow).filter(Workflow.equipment_id == equipment_id, Workflow.start_id == start_id)
+        )
         downtime = result.scalars().first()
-    
+
     if downtime:
-        downtime.answer_id = answer_id
+        downtime.answer_id = request.answer_id
         await db.commit()
         return {"status": "success", "message": "Downtime updated"}
     else:
@@ -256,6 +271,7 @@ async def get_answers(db: AsyncSession = Depends(get_db)):
         "answer_id": answer.answer_id,
         "answer_text": answer.answer_text
     } for answer in answers]
+
 
 
 if __name__ == "__main__":

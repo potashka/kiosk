@@ -5,9 +5,9 @@ body {
     padding: 0;
 }
 
-.container {
-    width: 300px;
-    margin: 100px auto;
+.container, .dashboard-container {
+    width: 80%;
+    margin: 20px auto;
     padding: 20px;
     border: 1px solid #ccc;
     border-radius: 5px;
@@ -16,7 +16,8 @@ body {
 
 input[type="text"],
 input[type="password"],
-select {
+select,
+.equipment-item select {
     width: 100%;
     padding: 10px;
     margin: 10px 0;
@@ -25,16 +26,46 @@ select {
     box-sizing: border-box;
 }
 
-button {
+button, .equipment-item button {
     background-color: #4CAF50;
     color: white;
-    padding: 14px 20px;
-    margin: 8px 0;
+    padding: 10px 15px;
+    margin: 5px 0;
     border: none;
     cursor: pointer;
-    width: 100%;
+    width: auto; /* Изменено для кнопок оборудования */
 }
 
-button:hover {
+button:hover, .equipment-item button:hover {
     opacity: 0.8;
+}
+
+/* Стили для элементов оборудования */
+.equipment-item {
+    margin-bottom: 20px;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+}
+
+.equipment-item.active {
+    background-color: #e8f5e9; /* светло-зеленый для активного оборудования */
+}
+
+.equipment-item.inactive {
+    background-color: #ffebee; /* светло-красный для неактивного оборудования */
+}
+
+.equipment-item > span {
+    font-size: 16px;
+    font-weight: bold;
+}
+
+.downtime-container {
+    display: none; /* изначально скрыт, отображается при наличии данных */
+    padding: 10px;
+    margin-top: 10px;
+    background-color: #f2f2f2;
+    border: 1px solid #ccc;
+    border-radius: 5px;
 }
