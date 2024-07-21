@@ -8,6 +8,7 @@
 <body>
     <div class="dashboard-container">
         <h1>Панель управления</h1>
+        <a href="/logout" class="home-button">На главную</a>
         <div id="equipment-list">
             <!-- Список оборудования заполняется динамически через JavaScript -->
         </div>
@@ -64,45 +65,54 @@
                 fetch(`/downtimes/${equipmentId}`)
                 .then(response => response.json())
                 .then(data => {
-                    console.log('Downtimes data:', data);
                     const container = document.getElementById(`downtimes-${equipmentId}`);
-                    container.innerHTML = '';  // Clear previous entries
-                    data.forEach(downtime => {
-                        const entry = document.createElement('div');
-                        entry.className = 'downtime-entry';
-                        entry.id = `downtime-${downtime.id.equipment_id}-${downtime.id.start_id}`;
-                        entry.innerHTML = `
-                            Start: ${downtime.start_id}, Stop: ${downtime.stop_id || 'Ongoing'}
-                            <button data-equipment-id="${downtime.id.equipment_id}" data-start-id="${downtime.id.start_id}" class="update-reason">Update Reason</button>
-                        `;
-                        container.appendChild(entry);
-                    });
+                    if (data.length > 0) { // Проверяем, есть ли данные
+                        container.style.display = 'block'; // Сделать контейнер видимым
+                        container.innerHTML = data.map(downtime => `
+                            <div class='downtime-entry' id='downtime-${downtime.id.equipment_id}-${downtime.id.start_id}'>
+                                Start: ${downtime.start_id}, Stop: ${downtime.stop_id || 'Ongoing'}
+                                <button data-equipment-id="${downtime.id.equipment_id}" data-start-id="${downtime.id.start_id}" class="update-reason">Выбрать причину простоя</button>
+                            </div>
+                        `).join('');
+                    } else {
+                        container.style.display = 'none'; // Оставить контейнер скрытым, если данных нет
+                    }
                 })
-                .catch(error => console.error('Error loading downtimes:', error));
-            }
+                .catch(error => {
+                    console.error('Error loading downtimes:', error);
+                    container.style.display = 'none'; // Скрыть контейнер при ошибке
+                });
+            }            
 
             document.addEventListener('click', function(event) {
                 if (event.target.matches('.update-reason')) {
                     showAnswers(event.target.getAttribute('data-equipment-id'), event.target.getAttribute('data-start-id'));
                 }
             });
-
             function showAnswers(equipmentId, startId) {
+                console.log(`Fetching answers for equipment ID: ${equipmentId} and start ID: ${startId}`);
                 fetch(`/answers`)
                 .then(response => response.json())
                 .then(data => {
+                    console.log("Received answers:", data); // Логируем полученные данные
+                    const container = document.querySelector(`#downtime-${equipmentId}-${startId}`);
+                    if (!container) {
+                        console.error('Container not found for ID:', `downtime-${equipmentId}-${startId}`);
+                        return;
+                    }
                     const selector = document.createElement('select');
                     data.forEach(answer => {
                         const option = document.createElement('option');
                         option.value = answer.answer_id;
-                        option.text = answer.answer_text;
+                        option.textContent = answer.answer_text;
                         selector.appendChild(option);
                     });
-                    selector.onchange = function() { updateDowntime(equipmentId, startId, this.value); }
-                    document.querySelector(`#downtime-${equipmentId}-${startId}`).appendChild(selector);
+                    container.appendChild(selector);
                 })
-                .catch(error => console.error('Error loading answers:', error));
-            }
+                .catch(error => {
+                    console.error('Error fetching answers:', error);
+                });
+            }                        
             function updateDowntime(equipmentId, startId, answerId) {
                 console.log("Original answerId:", answerId); // Для проверки исходного значения
                 const numericAnswerId = parseInt(answerId, 10);

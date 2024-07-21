@@ -35,6 +35,12 @@ class DowntimeUpdateRequest(BaseModel):
     answer_id: int
 
 
+@app.get("/")
+async def welcome(request: Request):
+    """Отображает приветственную страницу с ссылкой на выбор группы."""
+    return templates.TemplateResponse("welcome.html", {"request": request})
+
+
 @app.get("/select-group")
 async def select_group(request: Request, db: AsyncSession = Depends(get_db)):
     """Возвращает список доступных групп пользователей."""
@@ -95,6 +101,12 @@ async def login(request: Request, username: str = Form(...), password: str = For
     request.session['user_id'] = user.user_id
     request.session['group_id'] = group_id
     return RedirectResponse(url=f"/dashboard/{group_id}", status_code=303)
+
+
+@app.get("/logout")
+async def logout(request: Request):
+    request.session.clear()  # Очистка сессии
+    return RedirectResponse(url='/', status_code=303) 
 
 
 @app.get("/dashboard/{group_id}")
