@@ -69,3 +69,20 @@ button:hover, .equipment-item button:hover {
     border: 1px solid #ccc;
     border-radius: 5px;
 }
+
+.home-button {
+    font-size: 24px; /* Увеличение размера шрифта */
+    padding: 15px 30px; /* Увеличение отступа для удобства нажатия */
+    background-color: #4CAF50; /* Цвет фона кнопки */
+    color: white; /* Цвет текста */
+    text-decoration: none; /* Убираем подчёркивание текста */
+    border: none; /* Убираем границу */
+    border-radius: 5px; /* Скругляем углы */
+    cursor: pointer; /* Курсор в виде указателя */
+    display: inline-block; /* Делаем кнопку блочно-строчным элементом */
+    margin-bottom: 20px;
+}
+
+.home-button:hover {
+    background-color: #45a049; /* Цвет фона кнопки при наведении */
+}
