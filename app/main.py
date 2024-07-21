@@ -13,7 +13,10 @@ from werkzeug.security import check_password_hash
 
 from app.database import engine
 from app.dependencies import get_db
-from app.models import Base, Group, User, Equipment, AlertsSubscription, Workflow, AnswersList, UsersGroup
+from app.models import (
+    Base, Group, User, Equipment,
+    AlertsSubscription, Workflow, AnswersList, UsersGroup
+)
 
 
 @asynccontextmanager
@@ -105,6 +108,7 @@ async def login(request: Request, username: str = Form(...), password: str = For
 
 @app.get("/logout")
 async def logout(request: Request):
+    """Логаут пользователя"""
     request.session.clear()  # Очистка сессии
     return RedirectResponse(url='/', status_code=303) 
 
