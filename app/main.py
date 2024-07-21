@@ -1,10 +1,9 @@
 # app/main.py
-from contextlib import asynccontextmanager
 from datetime import datetime
-from fastapi import FastAPI, Depends, Form, HTTPException, Request, UploadFile
+from fastapi import FastAPI, Depends, Form, HTTPException, Request
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.future import select
+from sqlalchemy import text
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -13,28 +12,15 @@ from werkzeug.security import check_password_hash
 
 from app.database import engine
 from app.dependencies import get_db
-from app.models import (
-    Base, Group, User, Equipment,
-    AlertsSubscription, Workflow, AnswersList, UsersGroup
-)
 
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    """Создаёт и удаляет ресурсы при старте и завершении приложения."""
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    yield
-
-
-app = FastAPI(lifespan=lifespan)
+app = FastAPI()
 app.add_middleware(SessionMiddleware, secret_key="your_secret_key")
 templates = Jinja2Templates(directory="templates")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 
 class DowntimeUpdateRequest(BaseModel):
-    """Модель запроса для обновления информации о простое оборудования."""
+    """Модель для обновления информации о простое оборудования."""
     answer_id: int
 
 
@@ -47,9 +33,10 @@ async def welcome(request: Request):
 @app.get("/select-group")
 async def select_group(request: Request, db: AsyncSession = Depends(get_db)):
     """Возвращает список доступных групп пользователей."""
+    query = text("SELECT group_id, group_name FROM groups")  # Убедитесь, что поля называются именно так в вашей БД
     async with db.begin():
-        result = await db.execute(select(Group))
-        groups = result.scalars().all()
+        result = await db.execute(query)
+        groups = result.all()
     return templates.TemplateResponse("select_group.html", {"request": request, "groups": groups})
 
 
@@ -57,38 +44,28 @@ async def select_group(request: Request, db: AsyncSession = Depends(get_db)):
 async def set_group(request: Request, db: AsyncSession = Depends(get_db)):
     """Устанавливает группу пользователя в сессии и перенаправляет на страницу выбора пользователя."""
     form = await request.form()
-    group_id_value = form.get("group_id")
-    if isinstance(group_id_value, UploadFile):
-        raise HTTPException(status_code=400, detail="Invalid input type for group ID")
-    group_id_str = str(group_id_value)
-    if group_id_str is None:
-        raise HTTPException(status_code=400, detail="Group ID not provided")
-    try:
-        group_id = int(group_id_str)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid Group ID format")
-    request.session['group_id'] = group_id
+    group_id = form.get("group_id")
+    if not group_id:
+        raise HTTPException(status_code=400, detail="Не указан ID группы")
+    request.session['group_id'] = int(group_id)
     return RedirectResponse(url="/select-user", status_code=303)
 
 
 @app.get("/select-user")
 async def select_user(request: Request, db: AsyncSession = Depends(get_db)):
-    """Возвращает страницу для выбора пользователя в зависимости от выбранной группы."""
+    """Возвращает страницу для выбора пользователя на основе выбранной группы."""
     group_id = request.session.get('group_id')
-    if not group_id:
-        raise HTTPException(status_code=400, detail="Группа не выбрана")
+    query = text("SELECT users.* FROM users JOIN users_groups ON users.user_id = users_groups.user_id WHERE users_groups.group_id = :group_id")
     async with db.begin():
-        result = await db.execute(select(User).join(UsersGroup).filter(UsersGroup.group_id == group_id))
-        users = result.scalars().all()
+        result = await db.execute(query, {'group_id': group_id})
+        users = result.all()
     return templates.TemplateResponse("select_user.html", {"request": request, "users": users, "group_id": group_id})
 
 
 @app.get("/login")
 async def login_form(request: Request):
-    """Представляет форму входа."""
+    """Предоставляет форму входа."""
     username = request.query_params.get('username')
-    if not username:
-        raise HTTPException(status_code=400, detail="Пользователь не выбран")
     group_id = request.session.get('group_id')
     return templates.TemplateResponse("login.html", {"request": request, "username": username, "group_id": group_id})
 
@@ -96,51 +73,64 @@ async def login_form(request: Request):
 @app.post("/login")
 async def login(request: Request, username: str = Form(...), password: str = Form(...), group_id: int = Form(...), db: AsyncSession = Depends(get_db)):
     """Аутентификация пользователя и установка сессии после успешного входа."""
+    # SQL запрос для получения информации о пользователе и его пароле
+    query = text("""
+        SELECT users.user_id, users.user_password
+        FROM users
+        JOIN users_groups ON users.user_id = users_groups.user_id
+        WHERE users.user_name = :username AND users_groups.group_id = :group_id
+    """)
     async with db.begin():
-        result = await db.execute(select(User).join(UsersGroup, UsersGroup.user_id == User.user_id).filter(User.user_name == username, UsersGroup.group_id == group_id))
-        user = result.scalars().first()
+        result = await db.execute(query, {"username": username, "group_id": group_id})
+        user = result.first()
+
+    # Проверяем, существует ли пользователь и верный ли пароль
     if not user or not check_password_hash(user.user_password, password):
         raise HTTPException(status_code=401, detail="Неверное имя пользователя или пароль")
+
+    # Установка user_id и group_id в сессию
     request.session['user_id'] = user.user_id
     request.session['group_id'] = group_id
+
+    # Перенаправление пользователя на страницу панели управления
     return RedirectResponse(url=f"/dashboard/{group_id}", status_code=303)
 
 
 @app.get("/logout")
 async def logout(request: Request):
-    """Логаут пользователя"""
-    request.session.clear()  # Очистка сессии
-    return RedirectResponse(url='/', status_code=303) 
+    """Выход пользователя и очистка сессии."""
+    request.session.clear()
+    return RedirectResponse(url='/', status_code=303)
 
 
 @app.get("/dashboard/{group_id}")
 async def dashboard(request: Request, group_id: int, db: AsyncSession = Depends(get_db)):
     """Отображает панель управления, показывая все оборудование, связанное с выбранной группой."""
+    query = text("SELECT * FROM equipment WHERE group_id = :group_id")
     async with db.begin():
-        result = await db.execute(select(Equipment).filter(Equipment.group_id == group_id))
-        equipments = result.scalars().all()
+        result = await db.execute(query, {'group_id': group_id})
+        equipments = result.fetchall()
     return templates.TemplateResponse("dashboard.html", {"request": request, "equipments": equipments, "group_id": group_id})
 
 
 @app.get("/equipment/{group_id}")
 async def get_equipment(group_id: int, db: AsyncSession = Depends(get_db)):
     """Возвращает список оборудования вместе с их текущим статусом в выбранной группе."""
+    equipment_query = text("""
+        SELECT e.equipment_id, e.equipment_name, COALESCE(a.active, FALSE) AS active
+        FROM equipment e
+        LEFT JOIN alerts_subscription a ON e.equipment_id = a.equipment_id AND a.active = TRUE
+        WHERE e.group_id = :group_id
+    """)
     async with db.begin():
-        result = await db.execute(select(Equipment).filter(Equipment.group_id == group_id))
-        equipments = result.scalars().all()
-    equipment_list = []
-    for equipment in equipments:
-        subscription_result = await db.execute(
-            select(AlertsSubscription)
-            .filter(AlertsSubscription.equipment_id == equipment.equipment_id)
-            .order_by(AlertsSubscription.subscribe_time.desc())
-        )
-        subscription = subscription_result.scalars().first()
-        equipment_list.append({
-            "id": equipment.equipment_id,
-            "name": equipment.equipment_name,
-            "active": subscription.active if subscription else False
-        })
+        result = await db.execute(equipment_query, {'group_id': group_id})
+        equipments = result.all()  # Используем метод all() для получения всех результатов
+
+    # Обработка результатов как списка кортежей
+    equipment_list = [
+        {"id": eq[0], "name": eq[1], "active": eq[2]}
+        for eq in equipments
+    ]
     return equipment_list
 
 
@@ -151,78 +141,106 @@ def get_current_user(request: Request):
         raise HTTPException(status_code=400, detail="Пользователь не вошел в систему")
     return user_id
 
-
 @app.post("/toggle-equipment/{equipment_id}")
 async def toggle_equipment(equipment_id: int, user_id: str = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     """Переключает статус активности оборудования для пользователя."""
     async with db.begin():
-        result = await db.execute(
-            select(AlertsSubscription)
-            .filter(AlertsSubscription.equipment_id == equipment_id, AlertsSubscription.user_id == user_id)
-            .order_by(AlertsSubscription.subscribe_time.desc())
-        )
-        subscription = result.scalars().first()
-        if subscription and subscription.active:
-            subscription.active = False
-            subscription.unsubscribe_time = datetime.now()  # Обновите, если требуется серверное время
-        elif subscription:
-            subscription.active = True
-            subscription.subscribe_time = datetime.now()  # Обновите, если требуется серверное время
+        # Проверяем текущий статус подписки
+        subscription_query = text("""
+            SELECT id, active FROM alerts_subscription
+            WHERE equipment_id = :equipment_id AND user_id = :user_id
+            ORDER BY subscribe_time DESC
+            LIMIT 1
+        """)
+        subscription_result = await db.execute(subscription_query, {'equipment_id': equipment_id, 'user_id': user_id})
+        subscription = subscription_result.fetchone()
+
+        if subscription:
+            # Получаем значения через RowProxy._mapping для безопасного доступа к данным как к словарю
+            subscription_id = subscription._mapping['id']
+            current_active = subscription._mapping['active']
+
+            if current_active:
+                # Если активная, деактивируем
+                update_query = text("""
+                    UPDATE alerts_subscription SET active = FALSE, unsubscribe_time = timezone('utc', now())
+                    WHERE id = :id
+                """)
+                await db.execute(update_query, {'id': subscription_id})
+                active_status = False
+            else:
+                # Если неактивная, активируем
+                update_query = text("""
+                    UPDATE alerts_subscription SET active = TRUE, subscribe_time = timezone('utc', now())
+                    WHERE id = :id
+                """)
+                await db.execute(update_query, {'id': subscription_id})
+                active_status = True
         else:
-            subscription = AlertsSubscription(
-                equipment_id=equipment_id,
-                user_id=user_id,
-                active=True,
-                subscribe_time=datetime.now(),  # Обновите, если требуется серверное время
-                minutes_to_live=480
-            )
-            db.add(subscription)
+            # Создаем новую подписку
+            insert_query = text("""
+                INSERT INTO alerts_subscription (equipment_id, user_id, active, subscribe_time, minutes_to_live)
+                VALUES (:equipment_id, :user_id, TRUE, timezone('utc', now()), 480)
+            """)
+            await db.execute(insert_query, {'equipment_id': equipment_id, 'user_id': user_id})
+            active_status = True
+
         await db.commit()
-    return {"status": "success", "active": subscription.active, "equipment_id": equipment_id}
+
+    return {"status": "success", "active": active_status, "equipment_id": equipment_id}
 
 
 @app.get("/downtimes/{equipment_id}")
 async def get_downtimes(equipment_id: int, db: AsyncSession = Depends(get_db)):
     """Получает список всех простоев для указанного оборудования."""
+    query = text("""
+        SELECT equipment_id, start_id, stop_id, answer_id 
+        FROM workflow 
+        WHERE equipment_id = :equipment_id
+    """)
     async with db.begin():
-        result = await db.execute(select(Workflow).filter(Workflow.equipment_id == equipment_id))
-        downtimes = result.scalars().all()
-    return [{
-        "id": {"equipment_id": downtime.equipment_id, "start_id": downtime.start_id},
-        "equipment_id": downtime.equipment_id,
-        "start_id": datetime.utcfromtimestamp(downtime.start_id/1000).strftime("%Y-%m-%d %H:%M:%S"),
-        "stop_id": datetime.utcfromtimestamp(downtime.stop_id/1000).strftime("%Y-%m-%d %H:%M:%S") if downtime.stop_id else None,
-        "answer_id": downtime.answer_id
-    } for downtime in downtimes]
+        result = await db.execute(query, {'equipment_id': equipment_id})
+        downtimes = result.all()
+
+    # Используем названия колонок в ответе, как они определены в таблице
+    return [
+        {'equipment_id': dt.equipment_id, 'start_id': dt.start_id, 'stop_id': dt.stop_id, 'answer_id': dt.answer_id}
+        for dt in downtimes
+    ]
 
 
 @app.post("/update-downtime/{equipment_id}/{start_id}")
 async def update_downtime(equipment_id: int, start_id: int, request: DowntimeUpdateRequest, db: AsyncSession = Depends(get_db)):
     """Обновляет информацию о простое, связывая его с ответом оператора."""
+    query = text("""
+        UPDATE workflow 
+        SET answer_id = :answer_id 
+        WHERE equipment_id = :equipment_id AND start_id = :start_id 
+        RETURNING equipment_id, start_id, stop_id, answer_id
+    """)
     async with db.begin():
-        result = await db.execute(
-            select(Workflow).filter(Workflow.equipment_id == equipment_id, Workflow.start_id == start_id)
-        )
-        downtime = result.scalars().first()
+        result = await db.execute(query, {'answer_id': request.answer_id, 'equipment_id': equipment_id, 'start_id': start_id})
+        downtime = result.mappings().first()  # Используем mappings(), чтобы получить результат в виде словаря
+
     if downtime:
-        downtime.answer_id = request.answer_id
-        await db.commit()
-        return {"status": "success", "message": "Downtime updated"}
+        # Возвращаем информацию об обновлённом простое
+        return {
+            "status": "success",
+            "message": "Простой обновлен",
+            "data": downtime  # Отправляем данные как словарь
+        }
     else:
-        raise HTTPException(status_code=404, detail="Downtime not found")
+        # Если строка не была найдена или обновлена, возвращаем ошибку
+        raise HTTPException(status_code=404, detail="Простой не найден")
 
 
 @app.get("/answers")
 async def get_answers(db: AsyncSession = Depends(get_db)):
     """Возвращает список всех доступных ответов для использования в системе."""
+    query = text("SELECT answer_id, answer_text FROM answers_list")
     async with db.begin():
-        result = await db.execute(select(AnswersList))
-        answers = result.scalars().all()
-        response = [{"answer_id": answer.answer_id, "answer_text": answer.answer_text} for answer in answers]
-        print("Answers:", response)  # Добавьте логирование для отладки
-    return [{"answer_id": answer.answer_id, "answer_text": answer.answer_text} for answer in answers]
+        result = await db.execute(query)
+        answers = result.all()  # Получаем все строки, каждая строка будет в виде кортежа
+    # Преобразуем каждую строку (кортеж) в словарь
+    return [{'answer_id': ans[0], 'answer_text': ans[1]} for ans in answers]
 
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run("app.main:app", host="127.0.0.1", port=8000, reload=True)

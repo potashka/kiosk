@@ -1,5 +1,10 @@
-# coding: utf-8
-from sqlalchemy import BigInteger, Boolean, CHAR, Column, DateTime, Float, ForeignKey, Index, Integer, SmallInteger, String, Table, Text, Time, text
+# app/models
+# Файл носит справочный характер для настройки SQL запросов
+from sqlalchemy import (
+    BigInteger, Boolean, CHAR, Column, DateTime,
+    Float, ForeignKey, Index, Integer, SmallInteger,
+    String, Table, Text, Time, text  # noqa
+)
 from sqlalchemy.dialects.postgresql import OID, TIMESTAMP
 from sqlalchemy.orm import relationship
 from sqlalchemy.ext.declarative import declarative_base
