@@ -86,3 +86,13 @@ button:hover, .equipment-item button:hover {
 .home-button:hover {
     background-color: #45a049; /* Цвет фона кнопки при наведении */
 }
+
+.error-message {
+    color: #D8000C; /* Красный цвет текста */
+    background-color: #FFD2D2; /* Светло-красный фон */
+    padding: 10px; /* Внутренние отступы */
+    margin: 10px 0; /* Внешние отступы сверху и снизу */
+    border: 1px solid #D8000C; /* Красная рамка */
+    border-radius: 5px; /* Скругление углов рамки */
+    text-align: center; /* Выравнивание текста по центру */
+}

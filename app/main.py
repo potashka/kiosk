@@ -86,7 +86,14 @@ async def login(request: Request, username: str = Form(...), password: str = For
 
     # Проверяем, существует ли пользователь и верный ли пароль
     if not user or not check_password_hash(user.user_password, password):
-        raise HTTPException(status_code=401, detail="Неверное имя пользователя или пароль")
+        error_message = "Неверное имя пользователя или пароль"
+        return templates.TemplateResponse(
+            "login.html", {
+                "request": request, "error_message": error_message,
+                "username": username, "group_id": group_id
+            }
+        )
+        # raise HTTPException(status_code=401, detail="Неверное имя пользователя или пароль")
 
     # Установка user_id и group_id в сессию
     request.session['user_id'] = user.user_id
