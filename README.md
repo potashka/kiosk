@@ -30,7 +30,11 @@
 
 3. Создайте виртуальное окружение и активируйте его.
 4. Установите зависимости: `pip install -r requirements.txt`
-5. Запустите проект: `uvicorn app.main:app --reload`
+5. Запустите проект: 
+
+Например,  `uvicorn app.main:app --reload --port 8080` или
+
+`uvicorn app.main:app --reload --host 0.0.0.0 --port 8080` для внешнего хоста
 
 ### Структура проекта
 - `/app`: основная директория с исходным кодом.
