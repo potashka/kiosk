@@ -139,7 +139,26 @@
                 })
                 .catch(error => console.error('Error updating downtime:', error));
             }                        
-        </script>
+        
+            let idleTime = 0;
+        
+            function timerIncrement() {
+                idleTime += 1;
+                if (idleTime > 5) { // 5 минут бездействия
+                    window.location.href = '/logout';
+                }
+            }
+        
+            // Обнуление таймера при действиях пользователя
+            document.addEventListener('mousemove', resetTimer);
+            document.addEventListener('keypress', resetTimer);
+        
+            function resetTimer() {
+                idleTime = 0;
+            }
+        
+            setInterval(timerIncrement, 60000); // Ежеминутная проверка
+        </script>        
     </div>
 </body>
 </html>

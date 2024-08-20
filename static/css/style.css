@@ -96,3 +96,26 @@ button:hover, .equipment-item button:hover {
     border-radius: 5px; /* Скругление углов рамки */
     text-align: center; /* Выравнивание текста по центру */
 }
+
+.simple-keyboard {
+    max-width: 100%;
+    margin: 20px auto;
+    padding: 10px;
+    background-color: #f0f0f0;
+    border-radius: 10px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+}
+
+.simple-keyboard .hg-button {
+    padding: 10px;
+    margin: 5px;
+    font-size: 16px;
+    border-radius: 5px;
+    background-color: #ffffff;
+    border: 1px solid #ddd;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.simple-keyboard .hg-button:hover {
+    background-color: #e0e0e0;
+}
