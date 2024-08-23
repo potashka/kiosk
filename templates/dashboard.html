@@ -69,60 +69,51 @@
                         container.style.display = data.length > 0 ? 'block' : 'none';
                         container.innerHTML = data.map(downtime => `
                             <div class='downtime-entry' id='downtime-${downtime.equipment_id}-${downtime.start_id}'>
-                                Start: ${downtime.start_id}, Stop: ${downtime.stop_id || 'Ongoing'}
-                                <button data-equipment-id="${downtime.equipment_id}" data-start-id="${downtime.start_id}" class="update-reason">Выбрать причину простоя</button>
+                                <div>Начало: ${downtime.start_id || 'Unknown'}, Окончание простоя: ${downtime.stop_id || 'Продолжается'}</div>
+                                <label for="reason-${downtime.equipment_id}-${downtime.start_id}">Выбрать причину простоя:</label>
+                                <select id="reason-${downtime.equipment_id}-${downtime.start_id}" data-equipment-id="${downtime.equipment_id}" data-start-id="${downtime.start_id}">
+                                    <option value="">------</option>
+                                </select>
                             </div>
                         `).join('');
+                        data.forEach(downtime => {
+                            showAnswers(downtime.equipment_id, downtime.start_id);
+                        });
                     }
                 })
                 .catch(error => {
-                    console.error('Error loading downtimes:', error);
+                    console.error('Ошибка загрузки простоев:', error);
                     if (container) {
                         container.style.display = 'none'; // Скрыть контейнер при ошибке
                     }
                 });
-            }           
+            }
 
-            document.addEventListener('click', function(event) {
-                if (event.target.matches('.update-reason')) {
-                    showAnswers(event.target.getAttribute('data-equipment-id'), event.target.getAttribute('data-start-id'));
-                }
-            });
             function showAnswers(equipmentId, startId) {
-                const containerId = `downtime-${equipmentId}-${startId}`;
-                const container = document.getElementById(containerId);
-                if (!container) {
-                    console.error('Container not found for ID:', containerId);
+                const selector = document.getElementById(`reason-${equipmentId}-${startId}`);
+                if (!selector) {
+                    console.error('Selector not found for ID:', `reason-${equipmentId}-${startId}`);
                     return;
                 }
-            
-                // Очистка контейнера от предыдущего списка перед добавлением нового
-                container.innerHTML = ''; 
-            
+
                 fetch(`/answers`)
                 .then(response => response.json())
                 .then(data => {
-                    const selector = document.createElement('select');
-                    // Добавление опции с прочерком по умолчанию
-                    const defaultOption = document.createElement('option');
-                    defaultOption.value = "";
-                    defaultOption.textContent = "------";
-                    selector.appendChild(defaultOption); // ДОБАВЛЕНО
-                    selector.onchange = () => { // Добавление обработчика события на изменение выбора
-                        updateDowntime(equipmentId, startId, selector.value);
-                    };
                     data.forEach(answer => {
                         const option = document.createElement('option');
                         option.value = answer.answer_id;
                         option.textContent = answer.answer_text;
                         selector.appendChild(option);
                     });
-                    container.appendChild(selector); // Добавление селектора в контейнер
+                    selector.onchange = () => { // Добавление обработчика события на изменение выбора
+                        updateDowntime(equipmentId, startId, selector.value);
+                    };
                 })
                 .catch(error => {
                     console.error('Error fetching answers:', error);
                 });
-            }                                                            
+            }
+
             function updateDowntime(equipmentId, startId, answerId) {
                 console.log("Original answerId:", answerId); // Для проверки исходного значения
                 const numericAnswerId = parseInt(answerId, 10);
@@ -136,33 +127,33 @@
                 .then(response => response.json())
                 .then(data => {
                     if (data.status === 'success') {
-                        alert('Downtime updated successfully!');
+                        alert('Данные о простое обнвлены!');
                     } else {
-                        throw new Error(data.message || 'Failed to update downtime');
+                        throw new Error(data.message || 'Данные о простое не обновились');
                     }
                 })
                 .catch(error => console.error('Error updating downtime:', error));
-            }                        
-        
+            }
+
             let idleTime = 0;
-        
+
             function timerIncrement() {
                 idleTime += 1;
                 if (idleTime > 5) { // 5 минут бездействия
                     window.location.href = '/logout';
                 }
             }
-        
+
             // Обнуление таймера при действиях пользователя
             document.addEventListener('mousemove', resetTimer);
             document.addEventListener('keypress', resetTimer);
-        
+
             function resetTimer() {
                 idleTime = 0;
             }
-        
+
             setInterval(timerIncrement, 60000); // Ежеминутная проверка
-        </script>        
+        </script>
     </div>
     <a href="/logout" class="home-button">На главную страницу</a>
 </body>
