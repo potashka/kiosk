@@ -33,7 +33,7 @@ async def welcome(request: Request):
 @app.get("/select-group")
 async def select_group(request: Request, db: AsyncSession = Depends(get_db)):
     """Возвращает список доступных групп пользователей."""
-    query = text("SELECT group_id, group_name FROM groups")  # Убедитесь, что поля называются именно так в вашей БД
+    query = text("SELECT group_id, group_name FROM groups")
     async with db.begin():
         result = await db.execute(query)
         groups = result.all()
@@ -55,11 +55,24 @@ async def set_group(request: Request, db: AsyncSession = Depends(get_db)):
 async def select_user(request: Request, db: AsyncSession = Depends(get_db)):
     """Возвращает страницу для выбора пользователя на основе выбранной группы."""
     group_id = request.session.get('group_id')
-    query = text("SELECT users.* FROM users JOIN users_groups ON users.user_id = users_groups.user_id WHERE users_groups.group_id = :group_id")
+    query = text("""
+        SELECT users.user_id, users.user_name, users.user_full_name
+        FROM users
+        JOIN users_groups ON users.user_id = users_groups.user_id
+        WHERE users_groups.group_id = :group_id
+    """)
     async with db.begin():
         result = await db.execute(query, {'group_id': group_id})
-        users = result.all()
-    return templates.TemplateResponse("select_user.html", {"request": request, "users": users, "group_id": group_id})
+        users = result.fetchall()
+
+    user_data = [
+        {"user_name": user.user_name, "user_full_name": user.user_full_name} for user in users
+    ]
+
+    return templates.TemplateResponse(
+        "select_user.html",
+        {"request": request,"users": user_data, "group_id": group_id}
+    )
 
 
 @app.get("/login")
@@ -67,11 +80,17 @@ async def login_form(request: Request):
     """Предоставляет форму входа."""
     username = request.query_params.get('username')
     group_id = request.session.get('group_id')
-    return templates.TemplateResponse("login.html", {"request": request, "username": username, "group_id": group_id})
+    return templates.TemplateResponse(
+        "login.html", {"request": request, "username": username, "group_id": group_id}
+    )
 
 
 @app.post("/login")
-async def login(request: Request, username: str = Form(...), password: str = Form(...), group_id: int = Form(...), db: AsyncSession = Depends(get_db)):
+async def login(
+    request: Request, username: str = Form(...),
+    password: str = Form(...), group_id: int = Form(...),
+    db: AsyncSession = Depends(get_db)
+):
     """Аутентификация пользователя и установка сессии после успешного входа."""
     # SQL запрос для получения информации о пользователе и его пароле
     query = text("""
@@ -117,7 +136,10 @@ async def dashboard(request: Request, group_id: int, db: AsyncSession = Depends(
     async with db.begin():
         result = await db.execute(query, {'group_id': group_id})
         equipments = result.fetchall()
-    return templates.TemplateResponse("dashboard.html", {"request": request, "equipments": equipments, "group_id": group_id})
+    return templates.TemplateResponse(
+        "dashboard.html",
+        {"request": request, "equipments": equipments, "group_id": group_id}
+    )
 
 
 @app.get("/equipment/{group_id}")
@@ -149,7 +171,10 @@ def get_current_user(request: Request):
     return user_id
 
 @app.post("/toggle-equipment/{equipment_id}")
-async def toggle_equipment(equipment_id: int, user_id: str = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+async def toggle_equipment(
+    equipment_id: int, user_id: str = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
     """Переключает статус активности оборудования для пользователя."""
     async with db.begin():
         # Проверяем текущий статус подписки
@@ -159,7 +184,10 @@ async def toggle_equipment(equipment_id: int, user_id: str = Depends(get_current
             ORDER BY subscribe_time DESC
             LIMIT 1
         """)
-        subscription_result = await db.execute(subscription_query, {'equipment_id': equipment_id, 'user_id': user_id})
+        subscription_result = await db.execute(
+            subscription_query,
+            {'equipment_id': equipment_id, 'user_id': user_id}
+        )
         subscription = subscription_result.fetchone()
 
         if subscription:
@@ -217,7 +245,10 @@ async def get_downtimes(equipment_id: int, db: AsyncSession = Depends(get_db)):
 
 
 @app.post("/update-downtime/{equipment_id}/{start_id}")
-async def update_downtime(equipment_id: int, start_id: int, request: DowntimeUpdateRequest, db: AsyncSession = Depends(get_db)):
+async def update_downtime(
+    equipment_id: int, start_id: int,
+    request: DowntimeUpdateRequest, db: AsyncSession = Depends(get_db)
+):
     """Обновляет информацию о простое, связывая его с ответом оператора."""
     query = text("""
         UPDATE workflow 
@@ -250,4 +281,3 @@ async def get_answers(db: AsyncSession = Depends(get_db)):
         answers = result.all()  # Получаем все строки, каждая строка будет в виде кортежа
     # Преобразуем каждую строку (кортеж) в словарь
     return [{'answer_id': ans[0], 'answer_text': ans[1]} for ans in answers]
-

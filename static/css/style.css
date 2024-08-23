@@ -1,6 +1,7 @@
 body {
-    font-family: Arial, sans-serif;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     background-color: #f4f4f4;
+    color: #d8a47f;
     margin: 0;
     padding: 0;
 }
@@ -12,11 +13,24 @@ body {
     border: 1px solid #ccc;
     border-radius: 5px;
     background-color: #fff;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+}
+
+.login-container, .select-group-container, .user-select-container {
+    max-width: 500px; /* Максимальная ширина контейнера */
+    margin: 20px auto; /* Центровка контейнера */
+    padding: 20px;
+    background-color: #fff;
+    border-radius: 5px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); /* Легкая тень для отделения контейнера */
+}
+
+label, select, input[type="text"], input[type="password"], .equipment-item select {
+    font-size: 24px; /* Устанавливаем размер шрифта 24px */
 }
 
 input[type="text"],
 input[type="password"],
-select,
 .equipment-item select {
     width: 100%;
     padding: 10px;
@@ -24,10 +38,52 @@ select,
     display: inline-block;
     border: 1px solid #ccc;
     box-sizing: border-box;
+    max-width: 500px;
+}
+
+select {
+    padding: 10px; /* Внутренние отступы */
+    margin: 10px 0; /* Внешние отступы */
+    border: 1px solid #ccc; /* Рамка */
+    box-sizing: border-box; /* Учитывает отступы и границы в общей ширине */
+    border-radius: 5px; /* Скругленные углы */
+}
+
+.user-select-container select {
+    width: 300px; 
+    max-width: 100%; /* Ограничиваем максимальную ширину */
+    display: block; /* Делаем элемент блочным, чтобы он растянулся на всю ширину */
+}
+
+.select-group-container select {
+    width: 300px; 
+    max-width: 100%; /* Ограничиваем максимальную ширину */
+    display: block; /* Делаем элемент блочным, чтобы он растянулся на всю ширину */
+}
+
+
+.large-button {
+    background-color: #8a9a5b; /* Цвет фона кнопки */
+    color: white; /* Цвет текста */
+    padding: 15px 30px; /* Внутренние отступы */
+    margin: 10px 0; /* Внешние отступы */
+    border: none; /* Убираем границы */
+    cursor: pointer; /* Курсор указателя */
+    font-size: 24px; /* Размер шрифта */
+    border-radius: 5px; /* Скругляем углы */
+    text-decoration: none; /* Убираем подчеркивание */
+    display: inline-block; /* Делаем ссылку блочно-строчным элементом */
+    text-align: center; /* Центрируем текст */
+}
+
+.large-button:hover {
+    opacity: 0.8; /* Эффект при наведении */
+    background-color: #a0b085; /* Изменяем цвет фона при наведении */
 }
 
 button, .equipment-item button {
-    background-color: #4CAF50;
+    font-size: 24px;
+    background-color: #8a9a5b;
     color: white;
     padding: 10px 15px;
     margin: 5px 0;
@@ -57,7 +113,7 @@ button:hover, .equipment-item button:hover {
 }
 
 .equipment-item > span {
-    font-size: 16px;
+    font-size: 24px;
     font-weight: bold;
 }
 
@@ -73,7 +129,7 @@ button:hover, .equipment-item button:hover {
 .home-button {
     font-size: 24px; /* Увеличение размера шрифта */
     padding: 15px 30px; /* Увеличение отступа для удобства нажатия */
-    background-color: #4CAF50; /* Цвет фона кнопки */
+    background-color: #8a9a5b; /* Цвет фона кнопки */
     color: white; /* Цвет текста */
     text-decoration: none; /* Убираем подчёркивание текста */
     border: none; /* Убираем границу */
@@ -84,7 +140,7 @@ button:hover, .equipment-item button:hover {
 }
 
 .home-button:hover {
-    background-color: #45a049; /* Цвет фона кнопки при наведении */
+    background-color: #a0b085; /* Цвет фона кнопки при наведении */
 }
 
 .error-message {
@@ -118,4 +174,24 @@ button:hover, .equipment-item button:hover {
 
 .simple-keyboard .hg-button:hover {
     background-color: #e0e0e0;
+}
+
+.numeric-keyboard {
+    margin: 20px auto;
+    border-spacing: 10px; /* Отступы между кнопками */
+}
+
+.numeric-keyboard button {
+    width: 100px;
+    height: 100px;
+    font-size: 36px; /* Размер шрифта на кнопках */
+    border-radius: 5px;
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    cursor: pointer;
+}
+
+.numeric-keyboard button:hover {
+    background-color: #45a049; /* Цвет при наведении */
 }

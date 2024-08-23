@@ -9,13 +9,48 @@
     <div class="user-select-container">
         <h1>Выберите пользователя</h1>
         <form action="/login" method="get">
-            <select name="username" required>
-                {% for user in users %}
-                    <option value="{{ user.user_name }}">{{ user.user_name }}</option>
-                {% endfor %}
-            </select>
-            <button type="submit">Продолжить</button>
+            <table>
+                <tr>
+                    <td><label for="username">Табельный номер:</label></td>
+                    <td>
+                        <select name="username" id="username-select" required>
+                            <!-- Опция с прочерком по умолчанию -->
+                            <option value="" disabled selected>------</option>
+                            {% for user in users %}
+                                <option value="{{ user.user_name }}" data-fullname="{{ user.user_full_name }}">{{ user.user_name }}</option>
+                            {% endfor %}
+                        </select>
+                    </td>
+                </tr>
+                <tr>
+                    <td colspan="2">
+                        <div id="fullname-display" style="font-size: 24px; margin-top: 10px;"></div>
+                    </td>
+                </tr>
+                <tr>
+                    <td colspan="2" style="text-align: center;">
+                        <button type="submit" class="large-button">Продолжить</button>
+                    </td>
+                </tr>
+            </table>
         </form>
     </div>
+
+    <script>
+        // Обработка изменения выбора пользователя
+        document.getElementById('username-select').addEventListener('change', function() {
+            const selectedOption = this.options[this.selectedIndex];
+            const fullName = selectedOption.getAttribute('data-fullname');
+            document.getElementById('fullname-display').innerText = fullName ? `Ф.И.О: ${fullName}` : '';
+        });
+
+        // Инициализация отображения полного имени при загрузке страницы
+        window.onload = function() {
+            const selectElement = document.getElementById('username-select');
+            const selectedOption = selectElement.options[selectElement.selectedIndex];
+            const fullName = selectedOption.getAttribute('data-fullname');
+            document.getElementById('fullname-display').innerText = fullName ? `Ф.И.О: ${fullName}` : '';
+        };
+    </script>
 </body>
 </html>

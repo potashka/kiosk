@@ -104,6 +104,11 @@
                 .then(response => response.json())
                 .then(data => {
                     const selector = document.createElement('select');
+                    // Добавление опции с прочерком по умолчанию
+                    const defaultOption = document.createElement('option');
+                    defaultOption.value = "";
+                    defaultOption.textContent = "------";
+                    selector.appendChild(defaultOption); // ДОБАВЛЕНО
                     selector.onchange = () => { // Добавление обработчика события на изменение выбора
                         updateDowntime(equipmentId, startId, selector.value);
                     };

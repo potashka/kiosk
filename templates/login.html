@@ -4,76 +4,80 @@
     <meta charset="UTF-8">
     <title>Вход в систему</title>
     <link rel="stylesheet" href="/static/css/style.css">
-    <link rel="stylesheet" href="/static/css/index.css">
+    <link rel="stylesheet" href="/static/css/index.css"> <!-- для полной клавиатуры -->
 </head>
 <body>
     <div class="login-container">
-        <h2>Вход в систему</h2>
+        <h1>Вход в систему</h1>
         {% if error_message %}
         <div class="error-message">{{ error_message }}</div>
         {% endif %}
         <form action="/login" method="post">
             <input type="hidden" name="group_id" value="{{group_id}}" />
-            <div class="form-group">
-                <label for="username">Имя пользователя:</label>
-                <input type="text" id="username" name="username" value="{{ username }}" required>
-            </div>
-            <div class="form-group">
-                <label for="password">Пароль:</label>
-                <input type="password" id="password" name="password" required>
-            </div>
-            <div class="form-group">
-                <button type="submit">Вход</button>
-            </div>
-        </form>        
+            <table>
+                <tr>
+                    <td><label for="username">Табельный номер:</label></td>
+                    <td><input type="text" id="username" name="username" value="{{ username }}" required></td>
+                </tr>
+                <tr>
+                    <td><label for="password">Пароль:</label></td>
+                    <td><input type="password" id="password" name="password" required></td>
+                </tr>
+                <tr>
+                    <td>
+                        <button type="submit" class="large-button">Вход</button>
+                    </td>
+                </tr>
+            </table>
+        </form>       
     </div>
-    <!-- Добавляем элемент для отображения клавиатуры -->
-    <div class="simple-keyboard"></div>
+    <!-- Таблица для цифровой клавиатуры -->
+    <table class="numeric-keyboard">
+        <tr>
+            <td><button type="button" class="key">1</button></td>
+            <td><button type="button" class="key">2</button></td>
+            <td><button type="button" class="key">3</button></td>
+        </tr>
+        <tr>
+            <td><button type="button" class="key">4</button></td>
+            <td><button type="button" class="key">5</button></td>
+            <td><button type="button" class="key">6</button></td>
+        </tr>
+        <tr>
+            <td><button type="button" class="key">7</button></td>
+            <td><button type="button" class="key">8</button></td>
+            <td><button type="button" class="key">9</button></td>
+        </tr>
+        <tr>
+            <td colspan="2"><button type="button" class="key">0</button></td>
+            <td><button type="button" class="key">X</button></td> <!-- X для удаления символов -->
+        </tr>
+    </table>
 
-    <!-- Скрипт для работы клавиатуры -->
-    <script src="/static/index.js"></script>
     <script>
-        const Keyboard = window.SimpleKeyboard.default;
-
         let currentInput = null;
 
-        // Инициализация клавиатуры
-        const keyboard = new Keyboard({
-            onChange: input => {
-                if (currentInput) {
-                    currentInput.value = input;
-                }
-            },
-            onKeyPress: button => onKeyPress(button),
-            inputPattern: {
-                // Включение всех символов
-                default: /./
-            },
-            layout: {
-                default: [
-                    "1 2 3 4 5 6 7 8 9 0",
-                    "q w e r t y u i o p",
-                    "a s d f g h j k l",
-                    "z x c v b n m",
-                    "{shift} {space} {backspace}"
-                ]
-            }
-        });
-
-        // Привязка клавиатуры к полям ввода
         document.querySelector("#username").addEventListener("focus", () => {
             currentInput = document.querySelector("#username");
-            keyboard.setInput(currentInput.value);
         });
 
         document.querySelector("#password").addEventListener("focus", () => {
             currentInput = document.querySelector("#password");
-            keyboard.setInput(currentInput.value);
         });
 
-        function onKeyPress(button) {
-            console.log("Button pressed", button);
-        }
+        document.querySelectorAll('.key').forEach(button => {
+            button.addEventListener('click', () => {
+                const keyValue = button.innerText;
+
+                if (currentInput) {
+                    if (keyValue === 'X') {
+                        currentInput.value = currentInput.value.slice(0, -1); // Удаление последнего символа
+                    } else {
+                        currentInput.value += keyValue; // Добавление символа в текущее поле
+                    }
+                }
+            });
+        });
     </script>
 </body>
 </html>

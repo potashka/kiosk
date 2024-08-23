@@ -7,15 +7,25 @@
 </head>
 <body>
     <div class="select-group-container">
-        <h1>Выберите группу</h1>
+        <h1>Выберите цех</h1>
         <form action="/set-group" method="post">
-            <label for="group_id" hidden>Выберите группу</label> <!-- Доступность: добавлен скрытый label -->
-            <select name="group_id" id="group_id" required aria-label="Выбор группы">
-                {% for group in groups %}
-                    <option value="{{ group.group_id }}">{{ group.group_name }}</option>
-                {% endfor %}
-            </select>
-            <button type="submit">Продолжить</button>
+            <table>
+                <tr>
+                    <td><label for="group_id">Цех:</label></td>
+                    <td>
+                        <select name="group_id" id="group_id" required>
+                            {% for group in groups %}
+                                <option value="{{ group.group_id }}">{{ group.group_name }}</option>
+                            {% endfor %}
+                        </select>
+                    </td>
+                </tr>
+                <tr>
+                    <td>
+                        <button type="submit" class="large-button">Продолжить</button>
+                    </td>
+                </tr>
+            </table>
         </form>
     </div>
 </body>
