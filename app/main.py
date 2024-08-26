@@ -1,5 +1,5 @@
 # app/main.py
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from fastapi import FastAPI, Depends, Form, HTTPException, Request
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -18,10 +18,20 @@ app.add_middleware(SessionMiddleware, secret_key="your_secret_key")
 templates = Jinja2Templates(directory="templates")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
+KALININGRAD_TZ = timezone(timedelta(hours=2))
+
 
 class DowntimeUpdateRequest(BaseModel):
     """Модель для обновления информации о простое оборудования."""
     answer_id: int
+
+
+def convert_timestamp(ts):
+    "Ковертация даты из bigint во время"
+    if ts:
+        dt = datetime.fromtimestamp(ts / 1000, tz=KALININGRAD_TZ)
+        return dt.strftime("%H:%M:%S %d-%m-%Y")
+    return "Unknown"
 
 
 @app.get("/")
@@ -239,7 +249,12 @@ async def get_downtimes(equipment_id: int, db: AsyncSession = Depends(get_db)):
 
     # Используем названия колонок в ответе, как они определены в таблице
     return [
-        {'equipment_id': dt.equipment_id, 'start_id': dt.start_id, 'stop_id': dt.stop_id, 'answer_id': dt.answer_id}
+        {
+            'equipment_id': dt.equipment_id,
+            'start_id': convert_timestamp(dt.start_id),
+            'stop_id': convert_timestamp(dt.stop_id),
+            'answer_id': dt.answer_id
+        }
         for dt in downtimes
     ]
 
