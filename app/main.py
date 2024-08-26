@@ -1,6 +1,9 @@
 # app/main.py
-from datetime import datetime
-from fastapi import FastAPI, Depends, Form, HTTPException, Request
+from datetime import datetime, timezone, timedelta
+from fastapi import (
+    FastAPI, Depends, Form, HTTPException,
+    Query, Request, status
+)
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
@@ -18,10 +21,22 @@ app.add_middleware(SessionMiddleware, secret_key="your_secret_key")
 templates = Jinja2Templates(directory="templates")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
+KALININGRAD_TZ = timezone(timedelta(hours=2))
+USER_ROLE = 1
+PAGE_SIZE = 5
+PAGE = 1
 
 class DowntimeUpdateRequest(BaseModel):
     """Модель для обновления информации о простое оборудования."""
     answer_id: int
+
+
+def convert_timestamp(ts):
+    """Конвертация времени из  int"""
+    if ts:
+        dt = datetime.fromtimestamp(ts / 1000, tz=KALININGRAD_TZ)
+        return dt.strftime("%H:%M:%S %d-%m-%Y")
+    return "Unknown"
 
 
 @app.get("/")
@@ -129,40 +144,6 @@ async def logout(request: Request):
     return RedirectResponse(url='/', status_code=303)
 
 
-@app.get("/dashboard/{group_id}")
-async def dashboard(request: Request, group_id: int, db: AsyncSession = Depends(get_db)):
-    """Отображает панель управления, показывая все оборудование, связанное с выбранной группой."""
-    query = text("SELECT * FROM equipment WHERE group_id = :group_id")
-    async with db.begin():
-        result = await db.execute(query, {'group_id': group_id})
-        equipments = result.fetchall()
-    return templates.TemplateResponse(
-        "dashboard.html",
-        {"request": request, "equipments": equipments, "group_id": group_id}
-    )
-
-
-@app.get("/equipment/{group_id}")
-async def get_equipment(group_id: int, db: AsyncSession = Depends(get_db)):
-    """Возвращает список оборудования вместе с их текущим статусом в выбранной группе."""
-    equipment_query = text("""
-        SELECT e.equipment_id, e.equipment_name, COALESCE(a.active, FALSE) AS active
-        FROM equipment e
-        LEFT JOIN alerts_subscription a ON e.equipment_id = a.equipment_id AND a.active = TRUE
-        WHERE e.group_id = :group_id
-    """)
-    async with db.begin():
-        result = await db.execute(equipment_query, {'group_id': group_id})
-        equipments = result.all()  # Используем метод all() для получения всех результатов
-
-    # Обработка результатов как списка кортежей
-    equipment_list = [
-        {"id": eq[0], "name": eq[1], "active": eq[2]}
-        for eq in equipments
-    ]
-    return equipment_list
-
-
 def get_current_user(request: Request):
     """Извлекает и возвращает ID текущего пользователя из сессии."""
     user_id = request.session.get('user_id')
@@ -170,78 +151,211 @@ def get_current_user(request: Request):
         raise HTTPException(status_code=400, detail="Пользователь не вошел в систему")
     return user_id
 
+
+@app.get("/dashboard/{group_id}")
+async def dashboard(request: Request, group_id: int, db: AsyncSession = Depends(get_db)):
+    """Отображает панель управления, показывая все оборудование, связанное с выбранной группой."""
+    # Получаем текущего пользователя
+    user_id = get_current_user(request)
+    if not user_id:
+        raise HTTPException(status_code=400, detail="Пользователь не найден")
+
+    # Получаем имя текущего пользователя
+    user_query = text("SELECT user_name FROM users WHERE user_id = :user_id")
+    # Получаем список оборудования
+    equipment_query = text("SELECT * FROM equipment WHERE group_id = :group_id")
+    async with db.begin():
+        user_result = await db.execute(user_query, {'user_id': user_id})
+        user_name = user_result.scalar()
+        result = await db.execute(equipment_query, {'group_id': group_id})
+        equipments = result.fetchall()
+
+    return templates.TemplateResponse(
+        "dashboard.html",
+        {
+            "request": request,
+            "equipments": equipments,
+            "group_id": group_id,
+            "user_name": user_name,  # Передаем имя пользователя в шаблон
+            "PAGE": PAGE,
+            "PAGE_SIZE": PAGE_SIZE
+        }
+    )
+
+
+@app.get("/equipment/{group_id}")
+async def get_equipment(group_id: int, db: AsyncSession = Depends(get_db)):
+    """
+    Возвращает список оборудования вместе с их текущим статусом в выбранной группе,
+    включая пользователя.
+    """
+    equipment_query = text("""
+        SELECT e.equipment_id, e.equipment_name, COALESCE(a.active, FALSE) AS active, u.user_name
+        FROM equipment e
+        LEFT JOIN alerts_subscription a ON e.equipment_id = a.equipment_id AND a.active = TRUE
+        LEFT JOIN users u ON a.user_id = u.user_id
+        WHERE e.group_id = :group_id
+    """)
+    async with db.begin():
+        result = await db.execute(equipment_query, {'group_id': group_id})
+        equipments = result.all()
+
+    # Обработка результатов как списка словарей
+    equipment_list = [
+        {"id": eq[0], "name": eq[1], "active": eq[2], "user_name": eq[3]}
+        for eq in equipments
+    ]
+    return equipment_list
+
+
+async def can_toggle_equipment(user_id: str, equipment_id: int, db: AsyncSession):
+    """
+    Функция для проверки, может ли пользователь переключить статус оборудования.
+    """
+    async with db.begin():  # Начинаем транзакцию для проверки прав
+        # Получаем роль текущего пользователя
+        user_role_query = text("""
+            SELECT user_role FROM users
+            WHERE user_id = :user_id
+        """)
+        user_role_result = await db.execute(user_role_query, {'user_id': user_id})
+        user_role = user_role_result.scalar()
+
+        if user_role is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Пользователь не найден."
+            )
+
+        # Проверяем, занят ли станок другим пользователем
+        occupation_check_query = text("""
+            SELECT a.id, a.user_id, u.user_name FROM alerts_subscription a
+            JOIN users u ON a.user_id = u.user_id
+            WHERE a.equipment_id = :equipment_id AND a.active = TRUE
+            LIMIT 1
+        """)
+        occupation_check_result = await db.execute(occupation_check_query, {'equipment_id': equipment_id})
+        occupation = occupation_check_result.fetchone()
+
+        # Если оборудование уже занято другим пользователем, проверяем роль текущего пользователя
+        if occupation:
+            occupied_by_user_id = occupation.user_id
+            occupied_by_user_name = occupation.user_name
+
+            # Проверяем, имеет ли текущий пользователь права на изменение статуса
+            if occupied_by_user_id != user_id and user_role != USER_ROLE:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=f"Оборудование занято пользователем {occupied_by_user_name}. У вас нет прав на его переключение."
+                )
+
+    return True
+
+
 @app.post("/toggle-equipment/{equipment_id}")
 async def toggle_equipment(
-    equipment_id: int, user_id: str = Depends(get_current_user),
+    equipment_id: int,
+    user_id: str = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
     """Переключает статус активности оборудования для пользователя."""
-    async with db.begin():
-        # Проверяем текущий статус подписки
-        subscription_query = text("""
-            SELECT id, active FROM alerts_subscription
-            WHERE equipment_id = :equipment_id AND user_id = :user_id
-            ORDER BY subscribe_time DESC
+
+    # Проверяем, может ли текущий пользователь переключить оборудование
+    await can_toggle_equipment(user_id, equipment_id, db)
+
+    # Теперь переключаем оборудование
+    async with db.begin():  # Начинаем транзакцию только для изменения статуса оборудования
+        # Проверяем, занят ли станок кем-либо
+        occupation_check_query = text("""
+            SELECT a.id, a.user_id, u.user_name FROM alerts_subscription a
+            JOIN users u ON a.user_id = u.user_id
+            WHERE a.equipment_id = :equipment_id AND a.active = TRUE
             LIMIT 1
         """)
-        subscription_result = await db.execute(
-            subscription_query,
-            {'equipment_id': equipment_id, 'user_id': user_id}
-        )
-        subscription = subscription_result.fetchone()
+        occupation_check_result = await db.execute(occupation_check_query, {'equipment_id': equipment_id})
+        occupation = occupation_check_result.fetchone()
 
-        if subscription:
-            # Получаем значения через RowProxy._mapping для безопасного доступа к данным как к словарю
-            subscription_id = subscription._mapping['id']
-            current_active = subscription._mapping['active']
+        if occupation:
+            occupied_by_user_id = occupation.user_id
 
-            if current_active:
-                # Если активная, деактивируем
-                update_query = text("""
-                    UPDATE alerts_subscription SET active = FALSE, unsubscribe_time = timezone('utc', now())
-                    WHERE id = :id
+            if occupied_by_user_id == user_id:
+                # Если текущий пользователь занял оборудование, освобождаем его
+                deactivate_query = text("""
+                    UPDATE alerts_subscription
+                    SET active = FALSE, unsubscribe_time = timezone('utc', now())
+                    WHERE id = :subscription_id
                 """)
-                await db.execute(update_query, {'id': subscription_id})
+                await db.execute(deactivate_query, {'subscription_id': occupation.id})
                 active_status = False
             else:
-                # Если неактивная, активируем
-                update_query = text("""
-                    UPDATE alerts_subscription SET active = TRUE, subscribe_time = timezone('utc', now())
-                    WHERE id = :id
+                # Если текущий пользователь - мастер, освобождаем предыдущее занятие и занимаем оборудование
+                deactivate_query = text("""
+                    UPDATE alerts_subscription
+                    SET active = FALSE, unsubscribe_time = timezone('utc', now())
+                    WHERE id = :subscription_id
                 """)
-                await db.execute(update_query, {'id': subscription_id})
+                await db.execute(deactivate_query, {'subscription_id': occupation.id})
+
+                activate_query = text("""
+                    INSERT INTO alerts_subscription (equipment_id, user_id, active, subscribe_time, minutes_to_live)
+                    VALUES (:equipment_id, :user_id, TRUE, timezone('utc', now()), 480)
+                """)
+                await db.execute(activate_query, {'equipment_id': equipment_id, 'user_id': user_id})
                 active_status = True
         else:
-            # Создаем новую подписку
-            insert_query = text("""
+            # Если оборудование не занято, занимаем его текущим пользователем
+            activate_query = text("""
                 INSERT INTO alerts_subscription (equipment_id, user_id, active, subscribe_time, minutes_to_live)
                 VALUES (:equipment_id, :user_id, TRUE, timezone('utc', now()), 480)
             """)
-            await db.execute(insert_query, {'equipment_id': equipment_id, 'user_id': user_id})
+            await db.execute(activate_query, {'equipment_id': equipment_id, 'user_id': user_id})
             active_status = True
 
-        await db.commit()
+        await db.commit()  # Завершаем транзакцию
 
     return {"status": "success", "active": active_status, "equipment_id": equipment_id}
 
 
 @app.get("/downtimes/{equipment_id}")
-async def get_downtimes(equipment_id: int, db: AsyncSession = Depends(get_db)):
-    """Получает список всех простоев для указанного оборудования."""
+async def get_downtimes(
+    equipment_id: int,
+    page: int = Query(PAGE, alias="page", ge=PAGE),
+    page_size: int = Query(PAGE_SIZE, alias="page_size", ge=PAGE),
+    db: AsyncSession = Depends(get_db)
+):
+    """Получает список всех простоев для указанного оборудования с постраничным выводом."""
+    
+    offset = (page - 1) * page_size
+
     query = text("""
-        SELECT equipment_id, start_id, stop_id, answer_id 
-        FROM workflow 
-        WHERE equipment_id = :equipment_id
+        SELECT w.equipment_id, w.start_id, w.stop_id, w.answer_id, al.answer_text
+        FROM workflow w
+        LEFT JOIN answers_list al ON w.answer_id = al.answer_id
+        WHERE w.equipment_id = :equipment_id
+        ORDER BY w.start_id DESC
+        LIMIT :limit OFFSET :offset
     """)
     async with db.begin():
-        result = await db.execute(query, {'equipment_id': equipment_id})
+        result = await db.execute(query, {
+            'equipment_id': equipment_id,
+            'limit': page_size,
+            'offset': offset
+        })
         downtimes = result.all()
 
-    # Используем названия колонок в ответе, как они определены в таблице
     return [
-        {'equipment_id': dt.equipment_id, 'start_id': dt.start_id, 'stop_id': dt.stop_id, 'answer_id': dt.answer_id}
+        {
+            'equipment_id': dt.equipment_id,
+            'start_id': dt.start_id,  # Сохраняем как int
+            'start_time': convert_timestamp(dt.start_id),  # Для отображения
+            'stop_id': dt.stop_id,
+            'stop_time': convert_timestamp(dt.stop_id),  # Для отображения
+            'answer_id': dt.answer_id,
+            'answer_text': dt.answer_text if dt.answer_id else None
+        }
         for dt in downtimes
     ]
+
 
 
 @app.post("/update-downtime/{equipment_id}/{start_id}")

@@ -195,3 +195,51 @@ button:hover, .equipment-item button:hover {
 .numeric-keyboard button:hover {
     background-color: #45a049; /* Цвет при наведении */
 }
+
+
+.save-downtime-btn {
+    margin-top: 5px;
+}
+
+.downtime-entry {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.edit-downtime-btn {
+    margin-left: 10px;
+}
+
+.downtime-info {
+    flex: 1;
+}
+
+.equipment-header {
+    display: flex;
+    align-items: center;
+}
+
+.equipment-name {
+    margin-right: 20px; /* Отступ справа от названия станка */
+    font-weight: bold;
+    font-size: 1.5em;
+}
+
+.toggle-button,
+.downtime-button {
+    margin-right: 30px; /* Отступ справа от каждой кнопки */
+    margin-left: 30px;
+}
+
+.responsible-person {
+    margin-left: 50px; /* Отодвинуть на максимальное расстояние от кнопок */
+    font-weight: bold;
+    font-size: 1.2em;
+}
+
+.toggle-equipment {
+    margin-right: 30px; /* Отступ справа от каждой кнопки */
+    margin-left: 30px;
+}

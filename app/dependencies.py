@@ -5,11 +5,11 @@ from sqlalchemy.orm import sessionmaker
 from app.database import engine
 
 
-def get_db():
+async def get_db():
     """Генератор, предоставляющий асинхронную сессию базы данных."""
     SessionLocal = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
     db = SessionLocal()
     try:
         yield db
     finally:
-        db.close()
+        await db.close()
