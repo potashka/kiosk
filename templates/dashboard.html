@@ -23,7 +23,7 @@
                         item.className = 'equipment-item ' + (equipment.active ? 'active' : 'inactive');
                         item.innerHTML = `
                             <span>${equipment.name}</span>
-                            <button data-equipment-id="${equipment.id}" class="toggle-equipment">Смена</button>
+                            <button data-equipment-id="${equipment.id}" class="toggle-equipment">Переключить</button>
                             <button data-equipment-id="${equipment.id}" class="downtime-button">Простои</button>
                             <div id="downtimes-${equipment.id}" class="downtime-container"></div>
                         `;

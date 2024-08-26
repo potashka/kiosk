@@ -19,17 +19,11 @@ class Alert(Base):
         Index('unique_equipment_user_start', 'equipment_id', 'start_id', 'user_id', unique=True),
     )
 
-    id = Column(
-        BigInteger, primary_key=True,
-        server_default=text("nextval('alerts_id_seq'::regclass)")
-    )
+    id = Column(BigInteger, primary_key=True, server_default=text("nextval('alerts_id_seq'::regclass)"))
     equipment_id = Column(Integer, nullable=False)
     start_id = Column(BigInteger, nullable=False)
     user_id = Column(CHAR(32), nullable=False)
-    open_time = Column(
-        DateTime, nullable=False,
-        server_default=text("timezone('utc'::text, now())")
-    )
+    open_time = Column(DateTime, nullable=False, server_default=text("timezone('utc'::text, now())"))
     close_time = Column(DateTime)
     answer_id = Column(Integer)
     alarm_type = Column(Integer, nullable=False, server_default=text("0"))
@@ -39,16 +33,11 @@ class Alert(Base):
 class AlertsSubscription(Base):
     __tablename__ = 'alerts_subscription'
 
-    id = Column(
-        BigInteger, primary_key=True,
-        server_default=text("nextval('alerts_subscription_id_seq'::regclass)")
-    )
+    id = Column(BigInteger, primary_key=True, server_default=text("nextval('alerts_subscription_id_seq'::regclass)"))
     equipment_id = Column(Integer, nullable=False)
     user_id = Column(CHAR(32), nullable=False)
     active = Column(Boolean, nullable=False, server_default=text("true"))
-    subscribe_time = Column(
-        DateTime, nullable=False, server_default=text("timezone('utc'::text, now())")
-    )
+    subscribe_time = Column(DateTime, nullable=False, server_default=text("timezone('utc'::text, now())"))
     unsubscribe_time = Column(DateTime)
     minutes_to_live = Column(Integer, nullable=False, server_default=text("480"))
     subscribe_action = Column(Integer, server_default=text("0"))
@@ -155,10 +144,7 @@ class AnswersList(Base):
     answer_text = Column(String(400), nullable=False)
     answer_action = Column(SmallInteger)
     is_system = Column(Boolean, server_default=text("false"))
-    answer_category = Column(
-        ForeignKey('answers_categories.answer_category'), nullable=False,
-        index=True, server_default=text("1")
-    )
+    answer_category = Column(ForeignKey('answers_categories.answer_category'), nullable=False, index=True, server_default=text("1"))
     answer_color = Column(Text, nullable=False, server_default=text("'#BDF4A8'::text"))
 
     answers_category = relationship('AnswersCategory')
@@ -167,14 +153,8 @@ class AnswersList(Base):
 class UsersGroup(Base):
     __tablename__ = 'users_groups'
 
-    user_id = Column(
-        ForeignKey('users.user_id', ondelete='CASCADE', onupdate='CASCADE'),
-        primary_key=True, nullable=False
-    )
-    group_id = Column(
-        ForeignKey('groups.group_id', ondelete='CASCADE', onupdate='CASCADE'),
-        primary_key=True, nullable=False
-    )
+    user_id = Column(ForeignKey('users.user_id', ondelete='CASCADE', onupdate='CASCADE'), primary_key=True, nullable=False)
+    group_id = Column(ForeignKey('groups.group_id', ondelete='CASCADE', onupdate='CASCADE'), primary_key=True, nullable=False)
     user_role = Column(Integer, nullable=False, server_default=text("0"))
 
     group = relationship('Group')
