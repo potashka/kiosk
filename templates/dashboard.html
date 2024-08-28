@@ -23,11 +23,23 @@
             console.log("PAGE:", PAGE);
             console.log("PAGE_SIZE:", PAGE_SIZE);
             document.addEventListener("DOMContentLoaded", function() {
-                const groupId = "{{ group_id }}";  // Используем переданный group_id
-                fetch(`/equipment/${groupId}`)
+                const groupId = "{{ group_id }}";
+                loadEquipment(groupId, PAGE, PAGE_SIZE);
+            });
+            
+            function loadEquipment(groupId, page, pageSize) {
+                fetch(`/equipment/${groupId}?page=${page}&page_size=${pageSize}`)
                 .then(response => response.json())
                 .then(data => {
                     const list = document.getElementById('equipment-list');
+                    list.innerHTML = '';  // Очистка списка перед добавлением новых элементов
+            
+                    // Проверка, есть ли данные для отображения
+                    if (data.length === 0 && page === 1) {
+                        list.innerHTML = '<p>Нет данных для отображения.</p>';
+                        return; // Выход, если данных нет и это первая страница
+                    }
+                    
                     data.forEach(equipment => {
                         const item = document.createElement('div');
                         item.className = 'equipment-item ' + (equipment.active ? 'active' : 'inactive');
@@ -42,9 +54,30 @@
                         `;
                         list.appendChild(item);
                     });
+            
+                    // Добавление элементов управления пагинацией
+                    const paginationControls = document.createElement('div');
+                    paginationControls.className = 'pagination-controls';
+            
+                    // Логика отображения кнопок
+                    if (page > 1) {
+                        paginationControls.innerHTML += `<button onclick="loadEquipment(${groupId}, ${page - 1}, ${pageSize})"><<<</button>`;
+                    }
+            
+                    // Проверка на последнюю страницу
+                    if (data.length === pageSize) {
+                        paginationControls.innerHTML += `<button onclick="loadEquipment(${groupId}, ${page + 1}, ${pageSize})">>>></button>`;
+                    }
+            
+                    // Если есть данные, но меньше pageSize на текущей странице, это последняя страница
+                    if (data.length < pageSize && page > 1) {
+                        paginationControls.innerHTML = `<button onclick="loadEquipment(${groupId}, ${page - 1}, ${pageSize})"><<<</button>`;
+                    }
+            
+                    list.appendChild(paginationControls);
                 })
-                .catch(error => console.error('Error loading equipment:', error));
-            });
+                .catch(error => console.error('Ошибка загрузки оборудования:', error));
+            }                        
 
             document.addEventListener('click', function(event) {
                 if (event.target.matches('.toggle-equipment')) {

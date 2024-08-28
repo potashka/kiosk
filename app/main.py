@@ -184,23 +184,33 @@ async def dashboard(request: Request, group_id: int, db: AsyncSession = Depends(
 
 
 @app.get("/equipment/{group_id}")
-async def get_equipment(group_id: int, db: AsyncSession = Depends(get_db)):
+async def get_equipment(
+    group_id: int,
+    page: int = Query(PAGE, alias="page", ge=PAGE),
+    page_size: int = Query(PAGE_SIZE, alias="page_size", ge=PAGE),
+    db: AsyncSession = Depends(get_db)
+):
     """
-    Возвращает список оборудования вместе с их текущим статусом в выбранной группе,
-    включая пользователя.
+    Возвращает список оборудования с постраничным выводом для выбранной группы.
     """
+    offset = (page - 1) * page_size
+
     equipment_query = text("""
         SELECT e.equipment_id, e.equipment_name, COALESCE(a.active, FALSE) AS active, u.user_name
         FROM equipment e
         LEFT JOIN alerts_subscription a ON e.equipment_id = a.equipment_id AND a.active = TRUE
         LEFT JOIN users u ON a.user_id = u.user_id
         WHERE e.group_id = :group_id
+        ORDER BY e.equipment_id DESC
+        LIMIT :limit OFFSET :offset
     """)
     async with db.begin():
-        result = await db.execute(equipment_query, {'group_id': group_id})
+        result = await db.execute(
+            equipment_query,
+            {'group_id': group_id, 'limit': page_size, 'offset': offset}
+        )
         equipments = result.all()
 
-    # Обработка результатов как списка словарей
     equipment_list = [
         {"id": eq[0], "name": eq[1], "active": eq[2], "user_name": eq[3]}
         for eq in equipments
