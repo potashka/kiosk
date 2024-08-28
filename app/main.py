@@ -34,7 +34,7 @@ class DowntimeUpdateRequest(BaseModel):
 def convert_timestamp(ts):
     """Конвертация времени из  int"""
     if ts:
-        dt = datetime.fromtimestamp(ts / 1000, tz=KALININGRAD_TZ)
+        dt = datetime.fromtimestamp(ts, tz=KALININGRAD_TZ)
         return dt.strftime("%H:%M:%S %d-%m-%Y")
     return "Unknown"
 
