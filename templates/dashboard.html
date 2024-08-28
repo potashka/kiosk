@@ -32,7 +32,9 @@
                         const item = document.createElement('div');
                         item.className = 'equipment-item ' + (equipment.active ? 'active' : 'inactive');
                         item.innerHTML = `
-                            <span class="equipment-name">${equipment.name}</span>
+                            <div class="equipment-downtime-container">
+                                <span class="equipment-name">${equipment.name}</span>
+                            </div>
                             <button data-equipment-id="${equipment.id}" class="toggle-equipment">Смена</button>
                             <button data-equipment-id="${equipment.id}" class="downtime-button">Простои</button>
                             <span class="responsible-person">Табельный №: ${equipment.user_name || 'Отсутствует'}</span>

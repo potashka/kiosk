@@ -243,3 +243,10 @@ button:hover, .equipment-item button:hover {
     margin-right: 30px; /* Отступ справа от каждой кнопки */
     margin-left: 30px;
 }
+
+.equipment-downtime-container {
+    display: flex; /* Flexbox for buttons */
+    gap: 10px; /* Gap between buttons */
+    flex: 0 0 200px; /* Fixed width for buttons container */
+    justify-content: left; /* Center buttons horizontally */
+}
