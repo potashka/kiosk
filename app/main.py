@@ -329,7 +329,9 @@ async def can_toggle_equipment(user_id: str, equipment_id: int, db: AsyncSession
             WHERE a.equipment_id = :equipment_id AND a.active = TRUE
             LIMIT 1
         """)
-        occupation_check_result = await db.execute(occupation_check_query, {'equipment_id': equipment_id})
+        occupation_check_result = await db.execute(
+            occupation_check_query, {'equipment_id': equipment_id}
+        )
         occupation = occupation_check_result.fetchone()
 
         # Если оборудование уже занято другим пользователем, проверяем роль текущего пользователя
@@ -367,7 +369,9 @@ async def toggle_equipment(
             WHERE a.equipment_id = :equipment_id AND a.active = TRUE
             LIMIT 1
         """)
-        occupation_check_result = await db.execute(occupation_check_query, {'equipment_id': equipment_id})
+        occupation_check_result = await db.execute(
+            occupation_check_query, {'equipment_id': equipment_id}
+        )
         occupation = occupation_check_result.fetchone()
 
         if occupation:
@@ -483,7 +487,10 @@ async def update_downtime(
         RETURNING equipment_id, start_id, stop_id, answer_id
     """)
     async with db.begin():
-        result = await db.execute(query, {'answer_id': request.answer_id, 'equipment_id': equipment_id, 'start_id': start_id})
+        result = await db.execute(
+            query,
+            {'answer_id': request.answer_id, 'equipment_id': equipment_id, 'start_id': start_id}
+        )
         downtime = result.mappings().first()  # Используем mappings(), чтобы получить результат в виде словаря
 
     if downtime:
