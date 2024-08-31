@@ -1,11 +1,16 @@
 # app/models
-# Файл носит справочный характер для настройки SQL запросов
+"""
+Модуль `models` содержит определения моделей SQLAlchemy для работы с базой данных.
+
+Этот файл используется для настройки и работы с SQL-запросами, а также для описания
+структуры таблиц и связей между ними в базе данных.
+"""
 from sqlalchemy import (
     BigInteger, Boolean, CHAR, Column, DateTime,
     Float, ForeignKey, Index, Integer, SmallInteger,
     String, Table, Text, Time, text  # noqa
 )
-from sqlalchemy.dialects.postgresql import OID, TIMESTAMP
+# from sqlalchemy.dialects.postgresql import OID, TIMESTAMP
 from sqlalchemy.orm import relationship
 from sqlalchemy.ext.declarative import declarative_base
 
@@ -14,6 +19,20 @@ metadata = Base.metadata
 
 
 class Alert(Base):
+    """
+    Модель для таблицы `alerts`, представляющей собой оповещения по оборудованию.
+
+    Атрибуты:
+        id (BigInteger): Уникальный идентификатор оповещения.
+        equipment_id (Integer): Идентификатор оборудования.
+        start_id (BigInteger): Идентификатор начала оповещения.
+        user_id (CHAR(32)): Идентификатор пользователя, связанного с оповещением.
+        open_time (DateTime): Время открытия оповещения.
+        close_time (DateTime): Время закрытия оповещения.
+        answer_id (Integer): Идентификатор ответа.
+        alarm_type (Integer): Тип тревоги.
+        minutes_to_live (Integer): Время жизни оповещения в минутах.
+    """
     __tablename__ = 'alerts'
     __table_args__ = (
         Index('unique_equipment_user_start', 'equipment_id', 'start_id', 'user_id', unique=True),
@@ -31,6 +50,19 @@ class Alert(Base):
 
 
 class AlertsSubscription(Base):
+    """
+    Модель для таблицы `alerts_subscription`, представляющей собой подписки на оповещения.
+
+    Атрибуты:
+        id (BigInteger): Уникальный идентификатор подписки.
+        equipment_id (Integer): Идентификатор оборудования.
+        user_id (CHAR(32)): Идентификатор пользователя, связанного с подпиской.
+        active (Boolean): Статус подписки (активная/неактивная).
+        subscribe_time (DateTime): Время подписки.
+        unsubscribe_time (DateTime): Время отписки.
+        minutes_to_live (Integer): Время жизни подписки в минутах.
+        subscribe_action (Integer): Действие при подписке.
+    """
     __tablename__ = 'alerts_subscription'
 
     id = Column(BigInteger, primary_key=True, server_default=text("nextval('alerts_subscription_id_seq'::regclass)"))
@@ -50,6 +82,13 @@ t_all_db_volume = Table(
 
 
 class AnswersCategory(Base):
+    """
+    Модель для таблицы `answers_categories`, представляющей категории простоев.
+
+    Атрибуты:
+        answer_category (Integer): Идентификатор категории.
+        name (Text): Название категории.
+    """
     __tablename__ = 'answers_categories'
 
     answer_category = Column(Integer, primary_key=True)
@@ -70,6 +109,21 @@ t_bad_workflows = Table(
 
 
 class Equipment(Base):
+    """
+    Модель для таблицы `equipment`, представляющей оборудование.
+
+    Атрибуты:
+        equipment_id (Integer): Уникальный идентификатор оборудования.
+        group_id (Integer): Идентификатор группы (цеха).
+        equipment_name (String): Название оборудования.
+        equipment_status (Integer): Статус оборудования.
+        plan_val (Float): Плановое значение.
+        mac_address (String): MAC-адрес оборудования.
+        use_align_filter (Boolean): Использование фильтра выравнивания.
+        align_filter_secs (BigInteger): Время выравнивания в секундах.
+        std_window_secs (BigInteger): Время стандартного окна в секундах.
+        sort_order (Integer): Порядок сортировки.
+    """
     __tablename__ = 'equipment'
 
     equipment_id = Column(Integer, primary_key=True)
@@ -101,6 +155,15 @@ t_equipment_and_groups = Table(
 
 
 class Group(Base):
+    """
+    Модель для таблицы `groups`, представляющей группы (цеха).
+
+    Атрибуты:
+        group_id (Integer): Уникальный идентификатор группы.
+        parent_id (Integer): Идентификатор родительской группы.
+        group_name (String): Название группы.
+        group_status (Integer): Статус группы.
+    """
     __tablename__ = 'groups'
 
     group_id = Column(Integer, primary_key=True)
@@ -110,6 +173,24 @@ class Group(Base):
 
 
 class User(Base):
+    """
+    Модель для таблицы `users`, представляющей пользователей.
+
+    Атрибуты:
+        user_id (CHAR(32)): Уникальный идентификатор пользователя.
+        user_name (String): Имя пользователя.
+        user_full_name (String): Полное имя пользователя.
+        user_mail (String): Электронная почта пользователя.
+        user_role (Integer): Роль пользователя.
+        user_auth_type (Integer): Тип аутентификации пользователя.
+        user_status (Integer): Статус пользователя.
+        user_password (String): Хэш пароля пользователя.
+        salt (String): Соль для хэша пароля.
+        last_device_id (String): Идентификатор последнего устройства.
+        create_time (DateTime): Время создания пользователя.
+        update_time (DateTime): Время последнего обновления данных пользователя.
+        bad_tries (SmallInteger): Количество неудачных попыток входа.
+    """
     __tablename__ = 'users'
 
     user_id = Column(CHAR(32), primary_key=True)
@@ -128,6 +209,16 @@ class User(Base):
 
 
 class Workflow(Base):
+    """
+    Модель для таблицы `workflow`, представляющей рабочие процессы.
+
+    Атрибуты:
+        equipment_id (BigInteger): Уникальный идентификатор оборудования.
+        start_id (BigInteger): Идентификатор начала процесса.
+        stop_id (BigInteger): Идентификатор завершения процесса.
+        answer_id (Integer): Идентификатор ответа.
+        is_alerted (Boolean): Признак того, было ли оповещение.
+    """
     __tablename__ = 'workflow'
 
     equipment_id = Column(BigInteger, primary_key=True, nullable=False)
@@ -138,6 +229,17 @@ class Workflow(Base):
 
 
 class AnswersList(Base):
+    """
+    Модель для таблицы `answers_list`, представляющей список ответов.
+
+    Атрибуты:
+        answer_id (Integer): Уникальный идентификатор ответа.
+        answer_text (String): Текст ответа.
+        answer_action (SmallInteger): Действие, связанное с ответом.
+        is_system (Boolean): Признак системного ответа.
+        answer_category (Integer): Идентификатор категории ответа.
+        answer_color (Text): Цвет ответа.
+    """
     __tablename__ = 'answers_list'
 
     answer_id = Column(Integer, primary_key=True)
@@ -151,6 +253,14 @@ class AnswersList(Base):
 
 
 class UsersGroup(Base):
+    """
+    Модель для таблицы `users_groups`, представляющей связь между пользователями и группами.
+
+    Атрибуты:
+        user_id (CHAR(32)): Идентификатор пользователя.
+        group_id (Integer): Идентификатор группы.
+        user_role (Integer): Роль пользователя в группе.
+    """
     __tablename__ = 'users_groups'
 
     user_id = Column(ForeignKey('users.user_id', ondelete='CASCADE', onupdate='CASCADE'), primary_key=True, nullable=False)

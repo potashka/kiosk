@@ -1,4 +1,35 @@
 # app/main.py
+"""
+Модуль `main.py` является основной точкой входа для приложения на базе FastAPI.
+
+Функции и маршруты, определенные в этом модуле, предоставляют интерфейс для работы с пользователями,
+оборудованием и простоями на производстве. Модуль включает аутентификацию пользователей, выбор
+производственного цеха, работу с сессиями и отображение информации через HTML-шаблоны.
+
+Основные компоненты:
+- FastAPI приложение и его конфигурация.
+- Маршруты для обработки запросов пользователей, включая выбор группы (цеха), выбор пользователя и
+  аутентификацию.
+- Функции для работы с базой данных через SQLAlchemy, включая асинхронные запросы и транзакции.
+- Обработка сессий пользователей и хранение информации о текущем состоянии в сессии.
+- Шаблоны Jinja2 для отображения страниц пользователям.
+
+Модуль использует следующие ключевые библиотеки:
+- FastAPI: Основной веб-фреймворк для создания RESTful API.
+- SQLAlchemy: ORM для взаимодействия с базой данных.
+- Jinja2: Шаблонизатор для рендеринга HTML-страниц.
+- Starlette: Для работы с сессиями и статическими файлами.
+- Pydantic: Для валидации данных, поступающих в запросах.
+- Werkzeug: Для обработки хеширования паролей.
+
+Общие шаги, которые выполняет модуль:
+1. Инициализация приложения FastAPI с подключением middleware для сессий.
+2. Обработка GET и POST запросов для различных страниц, таких как выбор группы, выбор пользователя,
+   панель управления, и т.д.
+3. Взаимодействие с базой данных для извлечения и обновления данных о пользователях, оборудовании и простоях.
+4. Управление сессиями для хранения информации о текущем пользователе и выбранной группе.
+"""
+import os
 from datetime import datetime, timezone, timedelta
 from fastapi import (
     FastAPI, Depends, Form, HTTPException,
@@ -39,19 +70,52 @@ def convert_timestamp(ts):
     return "Unknown"
 
 
+def get_default_group_id():
+    """Функция для получения group_id из переменной окружения"""
+    return os.getenv("GROUP_ID")
+
+
 @app.get("/")
 async def welcome(request: Request):
-    """Отображает приветственную страницу с ссылкой на выбор группы."""
-    return templates.TemplateResponse("welcome.html", {"request": request})
+    """
+    Отображает приветственную страницу или перенаправляет на выбор пользователя,
+    если group_id установлен.
+    """
+    group_id = get_default_group_id()
+    if group_id:
+        # Если group_id установлен, сохраняем его в сессии и перенаправляем на выбор пользователя
+        request.session['group_id'] = int(group_id)
+        return RedirectResponse(url="/select-user", status_code=303)
+    else:
+        # Если group_id не установлен, отображаем приветственную страницу
+        return templates.TemplateResponse("welcome.html", {"request": request})
+
+
+@app.get("/auto-set-group")
+async def auto_set_group(request: Request, db: AsyncSession = Depends(get_db)):
+    """
+    Получаем group_id из переменной окружения
+    и перенаправляем на выбор пользователя, если установлен
+    """
+    group_id = get_default_group_id()
+    if group_id:
+        request.session['group_id'] = int(group_id)
+        return RedirectResponse(url="/select-user", status_code=303)
+    else:
+        return RedirectResponse(url="/select-group", status_code=303)
 
 
 @app.get("/select-group")
 async def select_group(request: Request, db: AsyncSession = Depends(get_db)):
-    """Возвращает список доступных групп пользователей."""
+    """
+    Возвращает список доступных групп пользователей или
+    перенаправляет на выбор пользователя, если group_id уже установлен.
+    """
     query = text("SELECT group_id, group_name FROM groups")
     async with db.begin():
         result = await db.execute(query)
         groups = result.all()
+
     return templates.TemplateResponse("select_group.html", {"request": request, "groups": groups})
 
 
@@ -70,6 +134,14 @@ async def set_group(request: Request, db: AsyncSession = Depends(get_db)):
 async def select_user(request: Request, db: AsyncSession = Depends(get_db)):
     """Возвращает страницу для выбора пользователя на основе выбранной группы."""
     group_id = request.session.get('group_id')
+    # auto_set = group_id == int(os.getenv("GROUP_ID", 0))
+    # Проверяем, был ли установлен group_id из переменной окружения
+    # Получаем значение group_id из переменной окружения как строку и преобразуем в int
+    env_group_id = os.getenv("GROUP_ID")
+    if env_group_id is not None:
+        env_group_id = int(env_group_id)
+    # Проверяем, был ли установлен group_id из переменной окружения
+    auto_set = group_id == env_group_id
     query = text("""
         SELECT users.user_id, users.user_name, users.user_full_name
         FROM users
@@ -86,7 +158,7 @@ async def select_user(request: Request, db: AsyncSession = Depends(get_db)):
 
     return templates.TemplateResponse(
         "select_user.html",
-        {"request": request,"users": user_data, "group_id": group_id}
+        {"request": request, "users": user_data, "group_id": group_id, "auto_set": auto_set}
     )
 
 
@@ -347,7 +419,7 @@ async def get_downtimes(
     db: AsyncSession = Depends(get_db)
 ):
     """Получает список всех простоев для указанного оборудования с постраничным выводом."""
-    
+
     offset = (page - 1) * page_size
 
     # Запрос для получения общего количества простоев
