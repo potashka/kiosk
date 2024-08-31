@@ -472,8 +472,6 @@ async def get_downtimes(
     }
 
 
-
-
 @app.post("/update-downtime/{equipment_id}/{start_id}")
 async def update_downtime(
     equipment_id: int, start_id: int,
