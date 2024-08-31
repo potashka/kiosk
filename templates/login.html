@@ -54,9 +54,12 @@
             <td><button type="button" class="key">X</button></td> <!-- X для удаления символов -->
         </tr>
     </table>
-
     <script>
-        let currentInput = null;
+        let currentInput = document.querySelector("#password"); // По умолчанию фокус на поле пароля
+
+        document.addEventListener("DOMContentLoaded", () => {
+            currentInput.focus(); // Устанавливаем фокус на поле пароля при загрузке страницы
+        });
 
         document.querySelector("#username").addEventListener("focus", () => {
             currentInput = document.querySelector("#username");

@@ -6,7 +6,18 @@ body {
     padding: 0;
 }
 
-.container, .dashboard-container {
+.container {
+    width: 80%;
+    margin: 20px auto;
+    transform: scale(1.1);
+    padding: 20px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    background-color: #fff;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+}
+
+.dashboard-container {
     width: 80%;
     margin: 20px auto;
     padding: 20px;
@@ -19,6 +30,7 @@ body {
 .login-container, .select-group-container, .user-select-container {
     max-width: 500px; /* Максимальная ширина контейнера */
     margin: 20px auto; /* Центровка контейнера */
+    transform: scale(1.1); /* Масштабирование всего контейнера */
     padding: 20px;
     background-color: #fff;
     border-radius: 5px;
@@ -250,3 +262,43 @@ button:hover, .equipment-item button:hover {
     flex: 0 0 200px; /* Fixed width for buttons container */
     justify-content: left; /* Center buttons horizontally */
 }
+
+.form-row {
+    display: flex;
+    align-items: center; /* Вертикальное выравнивание по центру */
+    margin-bottom: 15px; /* Отступ снизу для каждой строки */
+}
+
+.form-row label {
+    margin-right: 10px; /* Отступ справа от метки */
+    font-size: 24px; /* Размер шрифта для метки */
+}
+
+.form-row select {
+    flex-grow: 1; /* Позволяет селекту занимать оставшееся место */
+    padding: 5px; /* Внутренний отступ */
+    font-size: 24px; /* Размер шрифта для селекта */
+}
+
+.form-row button {
+    margin-top: 20px; /* Отступ сверху для кнопки */
+    font-size: 24px; /* Размер шрифта для кнопки */
+}
+
+#info-message {
+    display: none; /* Скрыто по умолчанию */
+    color: #8a9a5b; /* Цвет текста */
+    font-weight: bold; /* Жирный шрифт */
+    font-size: 24px; /* Увеличение размера шрифта */
+    position: fixed; /* Фиксированное положение на экране */
+    top: 50%; /* Центрирование по вертикали */
+    left: 50%; /* Центрирование по горизонтали */
+    transform: translate(-50%, -50%); /* Сдвиг для идеального центрирования */
+    background-color: rgba(255, 255, 255, 0.9); /* Белый фон с небольшой прозрачностью */
+    padding: 20px; /* Внутренние отступы */
+    border-radius: 10px; /* Скругление углов */
+    box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1); /* Тень для выделения */
+    z-index: 1000; /* Положение поверх других элементов */
+    text-align: center; /* Центрирование текста */
+}
+

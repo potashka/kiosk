@@ -13,7 +13,7 @@ from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 from werkzeug.security import check_password_hash
 
-from app.database import engine
+# from app.database import engine
 from app.dependencies import get_db
 
 app = FastAPI()
@@ -23,7 +23,7 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 
 KALININGRAD_TZ = timezone(timedelta(hours=2))
 USER_ROLE = 1
-PAGE_SIZE = 5
+PAGE_SIZE = 4
 PAGE = 1
 
 class DowntimeUpdateRequest(BaseModel):
@@ -195,6 +195,18 @@ async def get_equipment(
     """
     offset = (page - 1) * page_size
 
+    # Запрос для получения общего количества записей
+    count_query = text("""
+        SELECT COUNT(*)
+        FROM equipment
+        WHERE group_id = :group_id
+    """)
+    async with db.begin():
+        count_result = await db.execute(count_query, {'group_id': group_id})
+        total_records = count_result.scalar()  # Получаем общее количество записей
+
+    total_pages = (total_records + page_size - 1) // page_size  # Рассчитываем количество страниц
+
     equipment_query = text("""
         SELECT e.equipment_id, e.equipment_name, COALESCE(a.active, FALSE) AS active, u.user_name
         FROM equipment e
@@ -205,17 +217,18 @@ async def get_equipment(
         LIMIT :limit OFFSET :offset
     """)
     async with db.begin():
-        result = await db.execute(
-            equipment_query,
-            {'group_id': group_id, 'limit': page_size, 'offset': offset}
-        )
+        result = await db.execute(equipment_query, {'group_id': group_id, 'limit': page_size, 'offset': offset})
         equipments = result.all()
 
     equipment_list = [
         {"id": eq[0], "name": eq[1], "active": eq[2], "user_name": eq[3]}
         for eq in equipments
     ]
-    return equipment_list
+    return {
+        "equipments": equipment_list,
+        "current_page": page,
+        "total_pages": total_pages
+    }
 
 
 async def can_toggle_equipment(user_id: str, equipment_id: int, db: AsyncSession):
@@ -337,6 +350,18 @@ async def get_downtimes(
     
     offset = (page - 1) * page_size
 
+    # Запрос для получения общего количества простоев
+    count_query = text("""
+        SELECT COUNT(*)
+        FROM workflow
+        WHERE equipment_id = :equipment_id
+    """)
+    async with db.begin():
+        count_result = await db.execute(count_query, {'equipment_id': equipment_id})
+        total_records = count_result.scalar()  # Получаем общее количество простоев
+
+    total_pages = (total_records + page_size - 1) // page_size  # Рассчитываем количество страниц
+
     query = text("""
         SELECT w.equipment_id, w.start_id, w.stop_id, w.answer_id, al.answer_text
         FROM workflow w
@@ -353,18 +378,23 @@ async def get_downtimes(
         })
         downtimes = result.all()
 
-    return [
-        {
-            'equipment_id': dt.equipment_id,
-            'start_id': dt.start_id,  # Сохраняем как int
-            'start_time': convert_timestamp(dt.start_id),  # Для отображения
-            'stop_id': dt.stop_id,
-            'stop_time': convert_timestamp(dt.stop_id),  # Для отображения
-            'answer_id': dt.answer_id,
-            'answer_text': dt.answer_text if dt.answer_id else None
-        }
-        for dt in downtimes
-    ]
+    return {
+        "downtimes": [
+            {
+                'equipment_id': dt.equipment_id,
+                'start_id': dt.start_id,  # Сохраняем как int
+                'start_time': convert_timestamp(dt.start_id),  # Для отображения
+                'stop_id': dt.stop_id,
+                'stop_time': convert_timestamp(dt.stop_id),  # Для отображения
+                'answer_id': dt.answer_id,
+                'answer_text': dt.answer_text if dt.answer_id else None
+            }
+            for dt in downtimes
+        ],
+        "current_page": page,
+        "total_pages": total_pages
+    }
+
 
 
 

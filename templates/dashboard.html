@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <title>Панель управления</title>
     <link rel="stylesheet" href="/static/css/style.css">
-    
+    <div id="info-message"></div>
 </head>
 <body>
     <div class="dashboard-container">
@@ -32,52 +32,58 @@
                 .then(response => response.json())
                 .then(data => {
                     const list = document.getElementById('equipment-list');
-                    list.innerHTML = '';  // Очистка списка перед добавлением новых элементов
-            
-                    // Проверка, есть ли данные для отображения
-                    if (data.length === 0 && page === 1) {
-                        list.innerHTML = '<p>Нет данных для отображения.</p>';
-                        return; // Выход, если данных нет и это первая страница
-                    }
+                    list.innerHTML = '';  // Очистка списка перед добавлением новых элементов                    
                     
-                    data.forEach(equipment => {
-                        const item = document.createElement('div');
-                        item.className = 'equipment-item ' + (equipment.active ? 'active' : 'inactive');
-                        item.innerHTML = `
-                            <div class="equipment-downtime-container">
-                                <span class="equipment-name">${equipment.name}</span>
-                            </div>
-                            <button data-equipment-id="${equipment.id}" class="toggle-equipment">Смена</button>
-                            <button data-equipment-id="${equipment.id}" class="downtime-button">Простои</button>
-                            <span class="responsible-person">Табельный №: ${equipment.user_name || 'Отсутствует'}</span>
-                            <div id="downtimes-${equipment.id}" class="downtime-container"></div>
-                        `;
-                        list.appendChild(item);
-                    });
+                    if (data.equipments && Array.isArray(data.equipments)) {
+                        data.equipments.forEach(equipment => {
+                            const item = document.createElement('div');
+                            item.className = 'equipment-item ' + (equipment.active ? 'active' : 'inactive');
+                            const toggleButtonText = equipment.active ? 'Снять со смены' : 'Поставить на смену';
+                            item.innerHTML = `
+                                <div class="equipment-downtime-container">
+                                    <span class="equipment-name">${equipment.name}</span>
+                                </div>
+                                <button data-equipment-id="${equipment.id}" class="toggle-equipment">${toggleButtonText}</button>
+                                <button data-equipment-id="${equipment.id}" class="downtime-button">Простои</button>
+                                <span class="responsible-person">Табельный №: ${equipment.user_name || 'Отсутствует'}</span>
+                                <div id="downtimes-${equipment.id}" class="downtime-container"></div>
+                            `;
+                            list.appendChild(item);
+                        });
             
-                    // Добавление элементов управления пагинацией
-                    const paginationControls = document.createElement('div');
-                    paginationControls.className = 'pagination-controls';
+                        // Добавление элементов управления пагинацией
+                        const paginationControls = document.createElement('div');
+                        paginationControls.className = 'pagination-controls';
             
-                    // Логика отображения кнопок
-                    if (page > 1) {
-                        paginationControls.innerHTML += `<button onclick="loadEquipment(${groupId}, ${page - 1}, ${pageSize})"><<<</button>`;
+                        // Первая страница
+                        if (data.current_page > 1) {
+                            paginationControls.innerHTML += `
+                                <button onclick="loadEquipment(${groupId}, 1, ${pageSize})">Начало списка оборудования</button>
+                                <button onclick="loadEquipment(${groupId}, ${data.current_page - 1}, ${pageSize})"><<<</button>
+                            `;
+                        }
+            
+                        // Последняя страница
+                        if (data.current_page < data.total_pages) {
+                            paginationControls.innerHTML += `
+                                <button onclick="loadEquipment(${groupId}, ${data.current_page + 1}, ${pageSize})">>>></button>
+                                <button onclick="loadEquipment(${groupId}, ${data.total_pages}, ${pageSize})">Конец списка оборудования</button>
+                            `;
+                        }
+            
+                        // Если всего одна страница
+                        if (data.current_page === 1 && data.total_pages === 1) {
+                            paginationControls.innerHTML = '';
+                        }
+            
+                        list.appendChild(paginationControls);
+                    } else {
+                        console.error('Некорректный формат данных:', data);
                     }
-            
-                    // Проверка на последнюю страницу
-                    if (data.length === pageSize) {
-                        paginationControls.innerHTML += `<button onclick="loadEquipment(${groupId}, ${page + 1}, ${pageSize})">>>></button>`;
-                    }
-            
-                    // Если есть данные, но меньше pageSize на текущей странице, это последняя страница
-                    if (data.length < pageSize && page > 1) {
-                        paginationControls.innerHTML = `<button onclick="loadEquipment(${groupId}, ${page - 1}, ${pageSize})"><<<</button>`;
-                    }
-            
-                    list.appendChild(paginationControls);
                 })
                 .catch(error => console.error('Ошибка загрузки оборудования:', error));
-            }                        
+            }
+                                    
 
             document.addEventListener('click', function(event) {
                 if (event.target.matches('.toggle-equipment')) {
@@ -112,11 +118,41 @@
                     return response.json();
                 })
                 .then(data => {
+                    const infoMessage = document.getElementById('info-message');
+                    
                     if (data.status === 'success') {
-                        alert('Статус оборудования успешно переключен!');
-                        location.reload();  // Перезагрузка страницы для обновления статусов
+                        const button = document.querySelector(`.toggle-equipment[data-equipment-id="${equipmentId}"]`);
+                        const equipmentItem = button.closest('.equipment-item');
+                
+                        // Переключение текста на кнопке и изменение класса
+                        if (button.textContent.trim() === "Поставить на смену") {
+                            button.textContent = "Снять со смены";
+                            equipmentItem.classList.add('active');
+                            equipmentItem.classList.remove('inactive');
+                        } else {
+                            button.textContent = "Поставить на смену";
+                            equipmentItem.classList.add('inactive');
+                            equipmentItem.classList.remove('active');
+                        }
+                
+                        // Отображаем сообщение об успешном переключении
+                        infoMessage.textContent = 'Статус оборудования успешно переключен!';
+                        infoMessage.style.display = 'block';
+                
+                        // Скрываем сообщение через 3 секунды
+                        setTimeout(() => {
+                            infoMessage.style.display = 'none';
+                        }, 1000);
+                
                     } else if (data.status === 'error') {
-                        alert(`Ошибка: ${data.message}`);
+                        // Отображаем сообщение об ошибке
+                        infoMessage.textContent = `Ошибка: ${data.message}`;
+                        infoMessage.style.display = 'block';
+                
+                        // Скрываем сообщение через 3 секунды
+                        setTimeout(() => {
+                            infoMessage.style.display = 'none';
+                        }, 1000);
                     } else {
                         throw new Error(data.message || 'Не удалось переключить статус оборудования');
                     }
@@ -133,50 +169,73 @@
                     .then(data => {
                         const container = document.getElementById(`downtimes-${equipmentId}`);
                         if (container) {
-                            container.style.display = data.length > 0 ? 'block' : 'none';
-                            container.innerHTML = data.map(downtime => `
-                                <div class='downtime-entry' id='downtime-${downtime.equipment_id}-${downtime.start_id}'>
-                                    <div>
-                                        <h3>Начало: ${downtime.start_time || 'Неизвестно'}, Окончание простоя: ${downtime.stop_time || 'Продолжается'}</h3>
-                                        <h3><strong>Причина простоя:</strong> ${downtime.answer_text || 'Не указана'}</h3>
-                                    </div>
-                                    ${
-                                        downtime.answer_id
-                                        ? `<div>
-                                             <button class="edit-downtime-btn" style="float: right;" onclick="editDowntime(${downtime.equipment_id}, ${downtime.start_id})">Изменить</button>
-                                           </div>`
-                                        : `<div>
-                                             <label for="reason-${downtime.equipment_id}-${downtime.start_id}">Выбрать причину простоя:</label>
-                                             <select id="reason-${downtime.equipment_id}-${downtime.start_id}" data-equipment-id="${downtime.equipment_id}" data-start-id="${downtime.start_id}">
-                                                <option value="">------</option>
-                                             </select>
-                                           </div>`
+                            container.innerHTML = '';  // Очистка контейнера перед добавлением новых элементов
+                            
+                            if (data.downtimes && Array.isArray(data.downtimes)) {
+                                container.style.display = data.downtimes.length > 0 ? 'block' : 'none';
+                                data.downtimes.forEach(downtime => {
+                                    const downtimeEntry = document.createElement('div');
+                                    downtimeEntry.className = 'downtime-entry';
+                                    downtimeEntry.id = `downtime-${downtime.equipment_id}-${downtime.start_id}`;
+                                    downtimeEntry.innerHTML = `
+                                        <div>
+                                            <h3>Начало: ${downtime.start_time || 'Неизвестно'}, Окончание простоя: ${downtime.stop_time || 'Продолжается'}</h3>
+                                            <h3><strong>Причина простоя:</strong> ${downtime.answer_text || 'Не указана'}</h3>
+                                        </div>
+                                        ${downtime.answer_id
+                                            ? `<div>
+                                                 <button class="edit-downtime-btn" style="float: right;" onclick="editDowntime(${downtime.equipment_id}, ${downtime.start_id})">Изменить</button>
+                                               </div>`
+                                            : `<div>
+                                                 <label for="reason-${downtime.equipment_id}-${downtime.start_id}">Выбрать причину простоя:</label>
+                                                 <select id="reason-${downtime.equipment_id}-${downtime.start_id}" data-equipment-id="${downtime.equipment_id}" data-start-id="${downtime.start_id}">
+                                                    <option value="">------</option>
+                                                 </select>
+                                               </div>`
+                                        }
+                                    `;
+                                    container.appendChild(downtimeEntry);
+            
+                                    // Если нет answer_id, показываем варианты выбора
+                                    if (!downtime.answer_id) {
+                                        showAnswers(downtime.equipment_id, downtime.start_id);
                                     }
-                                </div>
-                            `).join('');
+                                });
             
-                            data.forEach(downtime => {
-                                if (!downtime.answer_id) {
-                                    showAnswers(downtime.equipment_id, downtime.start_id);
+                                // Добавление элементов управления пагинацией
+                                const paginationControls = document.createElement('div');
+                                paginationControls.className = 'pagination-controls';
+            
+                                // Первая страница
+                                if (data.current_page > 1) {
+                                    paginationControls.innerHTML += `
+                                        <button onclick="loadDowntimes(${equipmentId}, 1, ${pageSize})">Начало списка простоев</button>
+                                        <button onclick="loadDowntimes(${equipmentId}, ${data.current_page - 1}, ${pageSize})"><<<</button>
+                                    `;
                                 }
-                            });
             
-                            container.innerHTML += `
-                                <div class="pagination-controls">
-                                    <button onclick="loadDowntimes(${equipmentId}, ${page - 1}, ${pageSize})" ${page <= 1 ? 'disabled' : ''}><<<</button>
-                                    <button onclick="loadDowntimes(${equipmentId}, ${page + 1}, ${pageSize})">>>></button>
-                                </div>
-                            `;
+                                // Последняя страница
+                                if (data.current_page < data.total_pages) {
+                                    paginationControls.innerHTML += `
+                                        <button onclick="loadDowntimes(${equipmentId}, ${data.current_page + 1}, ${pageSize})">>>></button>
+                                        <button onclick="loadDowntimes(${equipmentId}, ${data.total_pages}, ${pageSize})">Конец списка простоев</button>
+                                    `;
+                                }
+            
+                                // Если всего одна страница
+                                if (data.current_page === 1 && data.total_pages === 1) {
+                                    paginationControls.innerHTML = '';
+                                }
+            
+                                container.appendChild(paginationControls);
+                            } else {
+                                console.error('Некорректный формат данных:', data);
+                            }
                         }
                     })
-                    .catch(error => {
-                        console.error('Ошибка загрузки простоев:', error);
-                        if (container) {
-                            container.style.display = 'none';
-                        }
-                    });
-            }                     
-            
+                    .catch(error => console.error('Ошибка загрузки простоев:', error));
+            }
+                                 
             function editDowntime(equipmentId, startId) {
                 const downtimeEntry = document.getElementById(`downtime-${equipmentId}-${startId}`);
                 
@@ -225,14 +284,37 @@
                 })
                 .then(response => response.json())
                 .then(data => {
+                    const infoMessage = document.getElementById('info-message'); // Добавляем обработку сообщений
+
                     if (data.status === 'success') {
-                        alert('Данные о простое обновлены!');
-                        loadDowntimes(equipmentId);
+                        // Отображаем сообщение об успешном обновлении
+                        infoMessage.textContent = 'Данные о простое обновлены!';
+                        infoMessage.style.display = 'block';
+            
+                        // Скрываем сообщение через 3 секунды
+                        setTimeout(() => {
+                            infoMessage.style.display = 'none';
+                        }, 1000);
+            
+                        loadDowntimes(equipmentId); // Перезагружаем список простоев
                     } else {
                         throw new Error(data.message || 'Данные о простое не обновились');
                     }
                 })
-                .catch(error => console.error('Error updating downtime:', error));
+                .catch(error => {
+                    const infoMessage = document.getElementById('info-message'); // Обработка ошибки
+            
+                    // Отображаем сообщение об ошибке
+                    infoMessage.textContent = `Ошибка: ${error.message}`;
+                    infoMessage.style.display = 'block';
+            
+                    // Скрываем сообщение через 3 секунды
+                    setTimeout(() => {
+                        infoMessage.style.display = 'none';
+                    }, 1000);
+            
+                    console.error('Error updating downtime:', error);
+                });
             }
 
             let idleTime = 0;
