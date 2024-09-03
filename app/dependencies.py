@@ -8,7 +8,7 @@ from app.logging_config import logger
 
 async def get_db():
     """Генератор, предоставляющий асинхронную сессию базы данных."""
-    #logger.info("Создание новой сессии базы данных")
+    logger.info("Создание новой сессии базы данных")
     SessionLocal = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
     db = SessionLocal()
     try:
