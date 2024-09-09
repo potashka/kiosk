@@ -26,7 +26,8 @@
 1. Инициализация приложения FastAPI с подключением middleware для сессий.
 2. Обработка GET и POST запросов для различных страниц, таких как выбор группы, выбор пользователя,
    панель управления, и т.д.
-3. Взаимодействие с базой данных для извлечения и обновления данных о пользователях, оборудовании и простоях.
+3. Взаимодействие с базой данных для извлечения и обновления данных
+о пользователях, оборудовании и простоях.
 4. Управление сессиями для хранения информации о текущем пользователе и выбранной группе.
 """
 import os
@@ -35,17 +36,18 @@ from fastapi import (
     FastAPI, Depends, Form, HTTPException,
     Query, Request, status
 )
-from pydantic import BaseModel
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import text
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from pydantic import BaseModel
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import text
 from starlette.middleware.sessions import SessionMiddleware
 from werkzeug.security import check_password_hash
 
 # from app.database import engine
 from app.dependencies import get_db
+from app.logging_config import logger
 
 app = FastAPI()
 app.add_middleware(SessionMiddleware, secret_key="your_secret_key")
@@ -53,6 +55,7 @@ templates = Jinja2Templates(directory="templates")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 KALININGRAD_TZ = timezone(timedelta(hours=2))
+# переменная для доп. прав пользователям,  не являющимся операторами, на изменение статуса оборудования
 USER_ROLE = 1
 PAGE_SIZE = 4
 PAGE = 1
@@ -72,7 +75,12 @@ def convert_timestamp(ts):
 
 def get_default_group_id():
     """Функция для получения group_id из переменной окружения"""
-    return os.getenv("GROUP_ID")
+    group_id = os.getenv("GROUP_ID")
+    if group_id:
+        logger.info("Получен GROUP_ID из переменной окружения: %s", group_id)
+    else:
+        logger.warning("GROUP_ID не установлен в переменных окружения")
+    return group_id
 
 
 @app.get("/")
@@ -81,13 +89,16 @@ async def welcome(request: Request):
     Отображает приветственную страницу или перенаправляет на выбор пользователя,
     если group_id установлен.
     """
+    logger.info("Отображение приветственной страницы")
     group_id = get_default_group_id()
     if group_id:
         # Если group_id установлен, сохраняем его в сессии и перенаправляем на выбор пользователя
+        logger.info("Перенаправление на выбор пользователя с group_id=%s", group_id)
         request.session['group_id'] = int(group_id)
         return RedirectResponse(url="/select-user", status_code=303)
     else:
         # Если group_id не установлен, отображаем приветственную страницу
+        logger.info("Отображение приветственной страницы без group_id")
         return templates.TemplateResponse("welcome.html", {"request": request})
 
 
@@ -97,11 +108,14 @@ async def auto_set_group(request: Request, db: AsyncSession = Depends(get_db)):
     Получаем group_id из переменной окружения
     и перенаправляем на выбор пользователя, если установлен
     """
+    logger.info("Автоматическая установка group_id")
     group_id = get_default_group_id()
     if group_id:
+        logger.info("group_id найден в окружении %s:", group_id)
         request.session['group_id'] = int(group_id)
         return RedirectResponse(url="/select-user", status_code=303)
     else:
+        logger.warning("group_id не найден в окружении")
         return RedirectResponse(url="/select-group", status_code=303)
 
 
@@ -111,6 +125,7 @@ async def select_group(request: Request, db: AsyncSession = Depends(get_db)):
     Возвращает список доступных групп пользователей или
     перенаправляет на выбор пользователя, если group_id уже установлен.
     """
+    logger.info("Получение списка доступных групп")
     query = text("SELECT group_id, group_name FROM groups")
     async with db.begin():
         result = await db.execute(query)
@@ -121,11 +136,16 @@ async def select_group(request: Request, db: AsyncSession = Depends(get_db)):
 
 @app.post("/set-group")
 async def set_group(request: Request, db: AsyncSession = Depends(get_db)):
-    """Устанавливает группу пользователя в сессии и перенаправляет на страницу выбора пользователя."""
+    """
+    Устанавливает группу пользователя в сессии и
+    перенаправляет на страницу выбора пользователя.
+    """
     form = await request.form()
     group_id = form.get("group_id")
     if not group_id:
+        logger.error("Не указан ID группы")
         raise HTTPException(status_code=400, detail="Не указан ID группы")
+    logger.info("Установка group_id в сессии: %s", group_id)
     request.session['group_id'] = int(group_id)
     return RedirectResponse(url="/select-user", status_code=303)
 
@@ -134,6 +154,7 @@ async def set_group(request: Request, db: AsyncSession = Depends(get_db)):
 async def select_user(request: Request, db: AsyncSession = Depends(get_db)):
     """Возвращает страницу для выбора пользователя на основе выбранной группы."""
     group_id = request.session.get('group_id')
+    logger.info("Выбор пользователя для group_id: %s", group_id)
     # auto_set = group_id == int(os.getenv("GROUP_ID", 0))
     # Проверяем, был ли установлен group_id из переменной окружения
     # Получаем значение group_id из переменной окружения как строку и преобразуем в int
@@ -167,6 +188,7 @@ async def login_form(request: Request):
     """Предоставляет форму входа."""
     username = request.query_params.get('username')
     group_id = request.session.get('group_id')
+    logger.info("Отображение формы входа для пользователя %s в группе %s", username, group_id)
     return templates.TemplateResponse(
         "login.html", {"request": request, "username": username, "group_id": group_id}
     )
@@ -179,6 +201,7 @@ async def login(
     db: AsyncSession = Depends(get_db)
 ):
     """Аутентификация пользователя и установка сессии после успешного входа."""
+    logger.info("Попытка входа пользователя %s в группу %s", username, group_id)
     # SQL запрос для получения информации о пользователе и его пароле
     query = text("""
         SELECT users.user_id, users.user_password
@@ -193,6 +216,9 @@ async def login(
     # Проверяем, существует ли пользователь и верный ли пароль
     if not user or not check_password_hash(user.user_password, password):
         error_message = "Неверное имя пользователя или пароль"
+        logger.warning(
+            "Ошибка аутентификации для пользователя %s: %s", username, error_message
+        )
         return templates.TemplateResponse(
             "login.html", {
                 "request": request, "error_message": error_message,
@@ -206,12 +232,14 @@ async def login(
     request.session['group_id'] = group_id
 
     # Перенаправление пользователя на страницу панели управления
+    logger.info("Пользователь %s успешно аутентифицирован", username)
     return RedirectResponse(url=f"/dashboard/{group_id}", status_code=303)
 
 
 @app.get("/logout")
 async def logout(request: Request):
     """Выход пользователя и очистка сессии."""
+    logger.info("Пользователь выходит из системы")
     request.session.clear()
     return RedirectResponse(url='/', status_code=303)
 
@@ -220,6 +248,7 @@ def get_current_user(request: Request):
     """Извлекает и возвращает ID текущего пользователя из сессии."""
     user_id = request.session.get('user_id')
     if not user_id:
+        logger.error("Пользователь не вошел в систему")
         raise HTTPException(status_code=400, detail="Пользователь не вошел в систему")
     return user_id
 
@@ -227,6 +256,7 @@ def get_current_user(request: Request):
 @app.get("/dashboard/{group_id}")
 async def dashboard(request: Request, group_id: int, db: AsyncSession = Depends(get_db)):
     """Отображает панель управления, показывая все оборудование, связанное с выбранной группой."""
+    logger.info("Отображение панели управления для group_id: %s", group_id)
     # Получаем текущего пользователя
     user_id = get_current_user(request)
     if not user_id:
@@ -265,6 +295,12 @@ async def get_equipment(
     """
     Возвращает список оборудования с постраничным выводом для выбранной группы.
     """
+    logger.info(
+        "Получение списка оборудования для group_id: %s, страница: %s, размер страницы: %s",
+        group_id,
+        page,
+        page_size
+    )
     offset = (page - 1) * page_size
 
     # Запрос для получения общего количества записей
@@ -289,9 +325,17 @@ async def get_equipment(
         LIMIT :limit OFFSET :offset
     """)
     async with db.begin():
-        result = await db.execute(equipment_query, {'group_id': group_id, 'limit': page_size, 'offset': offset})
+        result = await db.execute(
+            equipment_query,
+            {'group_id': group_id, 'limit': page_size, 'offset': offset}
+        )
         equipments = result.all()
 
+    logger.info(
+        "Список оборудования получен для group_id: %s, количество записей: %s",
+        group_id,
+        len(equipments)
+    )
     equipment_list = [
         {"id": eq[0], "name": eq[1], "active": eq[2], "user_name": eq[3]}
         for eq in equipments
@@ -307,6 +351,11 @@ async def can_toggle_equipment(user_id: str, equipment_id: int, db: AsyncSession
     """
     Функция для проверки, может ли пользователь переключить статус оборудования.
     """
+    logger.info(
+        "Проверка прав пользователя user_id: %s на переключение оборудования equipment_id: %s",
+        user_id,
+        equipment_id
+    )
     async with db.begin():  # Начинаем транзакцию для проверки прав
         # Получаем роль текущего пользователя
         user_role_query = text("""
@@ -317,6 +366,7 @@ async def can_toggle_equipment(user_id: str, equipment_id: int, db: AsyncSession
         user_role = user_role_result.scalar()
 
         if user_role is None:
+            logger.error("Пользователь user_id: %s не найден", user_id)
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Пользователь не найден."
@@ -338,9 +388,18 @@ async def can_toggle_equipment(user_id: str, equipment_id: int, db: AsyncSession
         if occupation:
             occupied_by_user_id = occupation.user_id
             occupied_by_user_name = occupation.user_name
+            logger.info(
+                "Оборудование занято пользователем %s (user_id: %s)",
+                occupied_by_user_name,
+                occupied_by_user_id
+            )
 
             # Проверяем, имеет ли текущий пользователь права на изменение статуса
             if occupied_by_user_id != user_id and user_role != USER_ROLE:
+                logger.warning(
+                    "Пользователь user_id: %s не имеет прав на переключение оборудования",
+                    user_id
+                )
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail=f"Оборудование занято пользователем {occupied_by_user_name}. У вас нет прав на его переключение."
@@ -356,6 +415,11 @@ async def toggle_equipment(
     db: AsyncSession = Depends(get_db)
 ):
     """Переключает статус активности оборудования для пользователя."""
+    logger.info(
+        "Переключение статуса оборудования equipment_id: %s пользователем user_id: %s",
+        equipment_id,
+        user_id
+    )
 
     # Проверяем, может ли текущий пользователь переключить оборудование
     await can_toggle_equipment(user_id, equipment_id, db)
@@ -386,6 +450,11 @@ async def toggle_equipment(
                 """)
                 await db.execute(deactivate_query, {'subscription_id': occupation.id})
                 active_status = False
+                logger.info(
+                    "Оборудование equipment_id: %s освобождено пользователем user_id: %s",
+                    equipment_id,
+                    user_id
+                )
             else:
                 # Если текущий пользователь - мастер, освобождаем предыдущее занятие и занимаем оборудование
                 deactivate_query = text("""
@@ -401,6 +470,11 @@ async def toggle_equipment(
                 """)
                 await db.execute(activate_query, {'equipment_id': equipment_id, 'user_id': user_id})
                 active_status = True
+                logger.info(
+                    "Оборудование equipment_id: %s занято пользователем user_id: %s",
+                    equipment_id,
+                    user_id
+                )
         else:
             # Если оборудование не занято, занимаем его текущим пользователем
             activate_query = text("""
@@ -409,6 +483,11 @@ async def toggle_equipment(
             """)
             await db.execute(activate_query, {'equipment_id': equipment_id, 'user_id': user_id})
             active_status = True
+            logger.info(
+                "Оборудование equipment_id: %s занято пользователем user_id: %s",
+                equipment_id,
+                user_id
+            )
 
         await db.commit()  # Завершаем транзакцию
 
@@ -423,6 +502,12 @@ async def get_downtimes(
     db: AsyncSession = Depends(get_db)
 ):
     """Получает список всех простоев для указанного оборудования с постраничным выводом."""
+    logger.info(
+        "Получение списка простоев для оборудования equipment_id: %s, страница: %s, размер страницы: %s",
+        equipment_id,
+        page,
+        page_size
+    )
 
     offset = (page - 1) * page_size
 
@@ -453,6 +538,12 @@ async def get_downtimes(
             'offset': offset
         })
         downtimes = result.all()
+        
+    logger.info(
+        "Список простоев получен для equipment_id: %s, количество записей: %s",
+        equipment_id,
+        len(downtimes)
+    )
 
     return {
         "downtimes": [
@@ -472,14 +563,17 @@ async def get_downtimes(
     }
 
 
-
-
 @app.post("/update-downtime/{equipment_id}/{start_id}")
 async def update_downtime(
     equipment_id: int, start_id: int,
     request: DowntimeUpdateRequest, db: AsyncSession = Depends(get_db)
 ):
     """Обновляет информацию о простое, связывая его с ответом оператора."""
+    logger.info(
+        "Обновление простоя для оборудования equipment_id: %s, start_id: %s",
+        equipment_id,
+        start_id
+    )
     query = text("""
         UPDATE workflow 
         SET answer_id = :answer_id 
@@ -495,6 +589,9 @@ async def update_downtime(
 
     if downtime:
         # Возвращаем информацию об обновлённом простое
+        logger.info(
+            "Простой обновлен для equipment_id: %s, start_id: %s", equipment_id, start_id
+        )
         return {
             "status": "success",
             "message": "Простой обновлен",
@@ -502,15 +599,20 @@ async def update_downtime(
         }
     else:
         # Если строка не была найдена или обновлена, возвращаем ошибку
+        logger.error(
+            "Простой не найден для equipment_id: %s, start_id: %s", equipment_id, start_id
+        )
         raise HTTPException(status_code=404, detail="Простой не найден")
 
 
 @app.get("/answers")
 async def get_answers(db: AsyncSession = Depends(get_db)):
     """Возвращает список всех доступных ответов для использования в системе."""
+    logger.info("Получение списка всех доступных ответов")
     query = text("SELECT answer_id, answer_text FROM answers_list")
     async with db.begin():
         result = await db.execute(query)
         answers = result.all()  # Получаем все строки, каждая строка будет в виде кортежа
+    logger.info("Получено %d ответов", len(answers))
     # Преобразуем каждую строку (кортеж) в словарь
     return [{'answer_id': ans[0], 'answer_text': ans[1]} for ans in answers]

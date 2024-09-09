@@ -182,24 +182,11 @@
                                             <h3>Начало: ${downtime.start_time || 'Неизвестно'}, Окончание простоя: ${downtime.stop_time || 'Продолжается'}</h3>
                                             <h3><strong>Причина простоя:</strong> ${downtime.answer_text || 'Не указана'}</h3>
                                         </div>
-                                        ${downtime.answer_id
-                                            ? `<div>
-                                                 <button class="edit-downtime-btn" style="float: right;" onclick="editDowntime(${downtime.equipment_id}, ${downtime.start_id})">Изменить</button>
-                                               </div>`
-                                            : `<div>
-                                                 <label for="reason-${downtime.equipment_id}-${downtime.start_id}">Выбрать причину простоя:</label>
-                                                 <select id="reason-${downtime.equipment_id}-${downtime.start_id}" data-equipment-id="${downtime.equipment_id}" data-start-id="${downtime.start_id}">
-                                                    <option value="">------</option>
-                                                 </select>
-                                               </div>`
-                                        }
+                                        <div>
+                                            <button class="edit-downtime-btn" style="float: right;" onclick="editDowntime(${downtime.equipment_id}, ${downtime.start_id})">Изменить</button>
+                                        </div>
                                     `;
                                     container.appendChild(downtimeEntry);
-            
-                                    // Если нет answer_id, показываем варианты выбора
-                                    if (!downtime.answer_id) {
-                                        showAnswers(downtime.equipment_id, downtime.start_id);
-                                    }
                                 });
             
                                 // Добавление элементов управления пагинацией
@@ -234,8 +221,7 @@
                         }
                     })
                     .catch(error => console.error('Ошибка загрузки простоев:', error));
-            }
-                                 
+            }               
             function editDowntime(equipmentId, startId) {
                 const downtimeEntry = document.getElementById(`downtime-${equipmentId}-${startId}`);
                 
@@ -250,7 +236,6 @@
             
                 showAnswers(equipmentId, startId);
             }                       
-            
             function showAnswers(equipmentId, startId) {
                 const selector = document.getElementById(`reason-${equipmentId}-${startId}`);
                 if (!selector) {
