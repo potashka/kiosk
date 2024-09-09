@@ -55,6 +55,7 @@ templates = Jinja2Templates(directory="templates")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 KALININGRAD_TZ = timezone(timedelta(hours=2))
+# переменная для доп. прав пользователям,  не являющимся операторами, на изменение статуса оборудования
 USER_ROLE = 1
 PAGE_SIZE = 4
 PAGE = 1
